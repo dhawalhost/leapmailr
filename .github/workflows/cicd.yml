@@ -29,4 +29,4 @@ jobs:
         run: chmod +x ./scripts/docker-build.sh
       - name: 🚀 Upload
         run: |
-          rsync --archive --stats -e 'ssh ' . ${{secrets.SSH_HOST_URL}}:~/leapmailr/
+          rsync -avz . ${{secrets.SSH_HOST_URL}}:~/leapmailr/
