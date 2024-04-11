@@ -41,7 +41,7 @@ LeapMailr is free software; you can redistribute it and/or modify it under the t
 Golang - Golang is used to build LeapMailr
 
 ## Authors and Acknowledgment
-LeapMailr was initial built by [Dhawal Dyavanpalli]("https://github.com/dhawalhost"). It is a free and open-source project.
+LeapMailr was initial built by [Dhawal Dyavanpalli](https://github.com/dhawalhost). It is a free and open-source project.
 
 ## Versioning
 This is still in development. We will be releasing new versions as we continue to improve the service.
