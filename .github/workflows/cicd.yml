@@ -13,6 +13,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Create .env file
+        run: echo "$ENV_FILE_CONTENT" > .env
+        
       - name: Setup SSH Key
         uses: shimataro/ssh-key-action@v2
         with:
@@ -28,6 +31,6 @@ jobs:
           script: |
             echo "${{ secrets.PRIVATE_SSH_KEY }}" > id_rsa
             chmod 600 id_rsa
-            scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/leapmailr/* ./
+            scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/mailr/* ./
             ssh -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }} "chmod +x ~/leapmailr/scripts/docker-build.sh && cd ~/leapmailr/ && ./scripts/docker-build.sh"
             rm id_rsa
