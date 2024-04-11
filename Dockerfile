@@ -1,5 +1,5 @@
 # # Stage 1: Build the Go application
-FROM golang:1.20 AS builder
+FROM golang:1.20
 
 # Set the Current Working Directory inside the container
 WORKDIR /go/src/app
@@ -14,7 +14,7 @@ RUN go mod download
 RUN go build -o main .
 
 # This container exposes port 8080 to the outside world
-EXPOSE 9090
+EXPOSE 3444
 
 # Run the executable
 CMD ["./main"]

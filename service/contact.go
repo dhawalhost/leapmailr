@@ -18,11 +18,13 @@ var (
 )
 
 func SubmitForm(sender models.Sender, recipient models.Recipient, form models.ContactForm, smtpServer models.SMTPDetails) (err error) {
-	sb := strings.Builder{}
-	subject := "Contact Us Submission from "
-	sb.WriteString(subject)
-	sb.WriteString(form.Name)
-	subject = sb.String()
+	if form.Subject == "" {
+		sb := strings.Builder{}
+		subject := "Contact Us Submission from "
+		sb.WriteString(subject)
+		sb.WriteString(form.Name)
+		form.Subject = sb.String()
+	}
 
 	htmlTemplate, err := os.ReadFile(contact_us_template)
 	if err != nil {
@@ -33,6 +35,7 @@ func SubmitForm(sender models.Sender, recipient models.Recipient, form models.Co
 	data := models.ContactUsData{
 		Name:    form.Name,
 		Email:   form.Email,
+		Subject: form.Subject,
 		Message: form.Message,
 		Logo:    config.GetConfig().LogoURL,
 	}
@@ -77,7 +80,7 @@ func SubmitForm(sender models.Sender, recipient models.Recipient, form models.Co
 	headers := make(map[string]string)
 	headers["From"] = fmt.Sprintf("%s <%s>", sender.Name, sender.Email)
 	headers["To"] = recipient.Email
-	headers["Subject"] = subject
+	headers["Subject"] = form.Subject
 	headers["MIME-Version"] = "1.0"
 	headers["Content-Type"] = "text/html; charset=utf-8"
 

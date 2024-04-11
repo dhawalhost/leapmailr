@@ -1,3 +1,4 @@
 #!/bin/bash
 
-go run main.go
+./scripts/build.sh
+./.target/leapmailr
