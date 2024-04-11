@@ -1,26 +1,32 @@
-name: Build and Deploy
+name: Build and Deploy Go Application
 
 on:
   push:
     branches:
-      - main
+      - release
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Create .env file
-        run: echo "$ENV_FILE_CONTENT" > .env
-        
-      - name: Install SSH Key
-        run: echo "$PRIVATE_SSH_KEY" > private.key
-        
-      - name: Give permissions to script files
-        run: chmod +x ./scripts/docker-build.sh
-      - name: 🚀 Upload
-        run: |
-          rsync -avz -e "ssh -i private.key" ./ ${{secrets.SSH_HOST_URL}}:~/leapmailr/
+    - name: Setup SSH Key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.PRIVATE_SSH_KEY }}
+
+    - name: Upload folder and execute Dockerfile on remote server using SSH
+  uses: appleboy/ssh-action@v0.1.7
+  with:
+    host: ${{ secrets.SSH_HOST }}
+    username: ${{ secrets.SSH_USERNAME }}
+    key: ${{ secrets.PRIVATE_SSH_KEY }}
+    script: |
+      echo "${{ secrets.PRIVATE_SSH_KEY }}" > id_rsa
+      chmod 600 id_rsa
+      scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/mailr/* ./
+      ssh -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }} "chmod +x ~/leapmailr/scripts/docker-build.sh && cd ~/leapmailr/ && ./scripts/docker-build.sh"
+      rm id_rsa
