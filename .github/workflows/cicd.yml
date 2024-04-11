@@ -28,6 +28,6 @@ jobs:
           script: |
             echo "${{ secrets.PRIVATE_SSH_KEY }}" > id_rsa
             chmod 600 id_rsa
-            scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/mailr/* ./
+            scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/leapmailr/* ./
             ssh -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }} "chmod +x ~/leapmailr/scripts/docker-build.sh && cd ~/leapmailr/ && ./scripts/docker-build.sh"
             rm id_rsa
