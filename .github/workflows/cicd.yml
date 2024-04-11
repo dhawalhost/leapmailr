@@ -10,23 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Setup SSH Key
-      uses: shimataro/ssh-key-action@v2
-      with:
-        key: ${{ secrets.PRIVATE_SSH_KEY }}
+      - name: Setup SSH Key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.PRIVATE_SSH_KEY }}
 
-    - name: Upload folder and execute Dockerfile on remote server using SSH
-  uses: appleboy/ssh-action@v0.1.7
-  with:
-    host: ${{ secrets.SSH_HOST }}
-    username: ${{ secrets.SSH_USERNAME }}
-    key: ${{ secrets.PRIVATE_SSH_KEY }}
-    script: |
-      echo "${{ secrets.PRIVATE_SSH_KEY }}" > id_rsa
-      chmod 600 id_rsa
-      scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/mailr/* ./
-      ssh -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }} "chmod +x ~/leapmailr/scripts/docker-build.sh && cd ~/leapmailr/ && ./scripts/docker-build.sh"
-      rm id_rsa
+      - name: Upload folder and execute Dockerfile on remote server using SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.PRIVATE_SSH_KEY }}
+          script: |
+            echo "${{ secrets.PRIVATE_SSH_KEY }}" > id_rsa
+            chmod 600 id_rsa
+            scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/mailr/* ./
+            ssh -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }} "chmod +x ~/leapmailr/scripts/docker-build.sh && cd ~/leapmailr/ && ./scripts/docker-build.sh"
+            rm id_rsa
