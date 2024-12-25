@@ -1,5 +1,5 @@
 # # Stage 1: Build the Go application
-FROM golang:1.20
+FROM golang:1.24rc1
 
 # Set the Current Working Directory inside the container
 WORKDIR /go/src/app
