@@ -9,6 +9,7 @@ import (
 	"github.com/dhawalhost/leapmailr/service"
 
 	"github.com/gin-gonic/gin"
+	"regexp"
 )
 
 // HandleContactForm handles the contact form submission
@@ -28,6 +29,11 @@ func HandleContactForm(c *gin.Context) {
 
 	// Sender and recipient details
 	sender := models.Sender{Name: conf.CompanyName, Email: conf.DefaultSenderMail}
+	// Validate email format
+	if !isValidEmail(form.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address"})
+		return
+	}
 	recipient := models.Recipient{Name: form.Name, Email: form.Email}
 
 	// Sending to Person who contacted
@@ -53,3 +59,4 @@ func HandleContactForm(c *gin.Context) {
 		"message": form.Message,
 	})
 }
+
