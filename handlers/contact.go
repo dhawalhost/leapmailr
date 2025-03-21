@@ -7,6 +7,7 @@ import (
 	"github.com/dhawalhost/leapmailr/config"
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +29,12 @@ func HandleContactForm(c *gin.Context) {
 
 	// Sender and recipient details
 	sender := models.Sender{Name: conf.CompanyName, Email: conf.DefaultSenderMail}
+	// Validate email format
+
+	if !utils.IsValidEmail(form.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address"})
+		return
+	}
 	recipient := models.Recipient{Name: form.Name, Email: form.Email}
 
 	// Sending to Person who contacted

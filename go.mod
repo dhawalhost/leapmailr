@@ -1,11 +1,18 @@
 module github.com/dhawalhost/leapmailr
 
-go 1.20
+go 1.22
+
+toolchain go1.23.4
 
 require (
 	github.com/gin-gonic/gin v1.9.1
+	github.com/newrelic/go-agent/v3 v3.38.0
+	github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrzap v1.2.2
+	github.com/newrelic/go-agent/v3/integrations/nrgin v1.3.3
 	github.com/spf13/viper v1.18.2
+	go.uber.org/zap v1.24.0
 	golang.org/x/time v0.5.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
@@ -40,12 +47,14 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/crypto v0.17.0 // indirect
+	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
-	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
+	google.golang.org/grpc v1.65.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
