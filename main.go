@@ -18,8 +18,14 @@ func main() {
 
 	}
 	logger := logging.InitLogger()
-	defer logger.Sync()
-
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	if conf.EnvMode == "release" {
+		logger.Info("release mode")
+	}
 	r := gin.New()
 	r.Use(middleware.CorsMiddleware())
 	r.Use(middleware.LoggerMiddleware())
@@ -27,7 +33,7 @@ func main() {
 	rg := r.Group("/api/v1", middleware.LimitMiddleware())
 	rg.POST("/contact", handlers.HandleContactForm)
 	r.GET("/health", handlers.HandleHealthCheck)
-
-	r.Run(fmt.Sprintf(":%v", conf.Port))
-
+	if err := r.Run(fmt.Sprintf(":%v", conf.Port)); err != nil {
+		panic(err)
+	}
 }
