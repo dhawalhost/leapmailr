@@ -9,25 +9,20 @@ var (
 )
 
 type AppConfig struct {
-	Port              string
-	DefaultSenderMail string
-	CompanyName       string
-	EnvMode           string
-	ContactMail       string
-	LogoURL           string
+	Port              string `mapstructure:"PORT"`
+	DefaultSenderMail string `mapstructure:"DEFAULT_SENDER_MAIL"`
+	CompanyName       string `mapstructure:"COMPANY_NAME"`
+	EnvMode           string `mapstructure:"ENV_MODE"`
+	ContactMail       string `mapstructure:"CONTACT_MAIL"`
+	LogoURL           string `mapstructure:"LOGO_URL"`
 
-	SMTPServer string
-	SMTPMail   string
-	SMTPSecret string
-	SMTPPort   int
-	RateLimit  int
-	NRLicense  string
+	SMTPServer string `mapstructure:"SMTP_SERVER_URL"`
+	SMTPMail   string `mapstructure:"SMTP_USER"`
+	SMTPSecret string `mapstructure:"SMTP_SECRET"`
+	SMTPPort   int    `mapstructure:"SMTP_PORT"`
+	RateLimit  int    `mapstructure:"RATE_LIMIT"`
+	NRLicense  string `mapstructure:"NR_LICENSE_KEY"`
 }
-
-var (
-	LogoURL = "https://dhawalhost.com/img/general/dhlogov.png"
-	MailTo  = "dhawalhost@gmail.com"
-)
 
 // Load configuration from environment file using Viper
 func LoadConfig() *AppConfig {
@@ -35,20 +30,7 @@ func LoadConfig() *AppConfig {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}
-	appConfig = &AppConfig{
-		Port:              viper.GetString("PORT"),
-		DefaultSenderMail: viper.GetString("DEFAULT_SENDER_MAIL"),
-		CompanyName:       viper.GetString("COMPANY_NAME"),
-		EnvMode:           viper.GetString("ENV_MODE"),
-		ContactMail:       viper.GetString("CONTACT_MAIL"),
-		LogoURL:           viper.GetString("LOGO_URL"),
-		SMTPServer:        viper.GetString("SMTP_SERVER_URL"),
-		SMTPMail:          viper.GetString("SMTP_USER"),
-		SMTPSecret:        viper.GetString("SMTP_SECRET"),
-		SMTPPort:          viper.GetInt("SMTP_PORT"),
-		RateLimit:         viper.GetInt("RATE_LIMIT"),
-		NRLicense:         viper.GetString("NR_LICENSE_KEY"),
-	}
+	viper.AutomaticEnv()
 	return appConfig
 }
 
