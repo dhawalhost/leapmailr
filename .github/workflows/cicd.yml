@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
@@ -15,22 +15,10 @@ jobs:
 
       - name: Create .env file
         run: echo "$ENV_FILE_CONTENT" > .env
-        
-      - name: Setup SSH Key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.PRIVATE_SSH_KEY }}
-          known_hosts: 'just-for-validation'
+      
+      - name: Build Go Application
+        run: ./scripts/build.sh
 
-      - name: Upload folder and execute Dockerfile on remote server using SSH
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.PRIVATE_SSH_KEY }}
-          script: |
-            echo "${{ secrets.PRIVATE_SSH_KEY }}" > id_rsa
-            chmod 600 id_rsa
-            scp -r -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }}:~/mailr/* ./
-            ssh -o StrictHostKeyChecking=no -i id_rsa ${{ secrets.SSH_HOST_URL }} "chmod +x ~/leapmailr/scripts/docker-build.sh && cd ~/leapmailr/ && ./scripts/docker-build.sh"
-            rm id_rsa
+      - name: Build Docker Image and Run Container
+        run: ./scripts/docker-build.sh
+
