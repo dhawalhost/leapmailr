@@ -31,6 +31,20 @@ func LoadConfig() *AppConfig {
 		panic(err)
 	}
 	viper.AutomaticEnv()
+	appConfig = &AppConfig{
+		Port:              viper.GetString("PORT"),
+		DefaultSenderMail: viper.GetString("DEFAULT_SENDER_MAIL"),
+		CompanyName:       viper.GetString("COMPANY_NAME"),
+		EnvMode:           viper.GetString("ENV_MODE"),
+		ContactMail:       viper.GetString("CONTACT_MAIL"),
+		LogoURL:           viper.GetString("LOGO_URL"),
+		SMTPServer:        viper.GetString("SMTP_SERVER_URL"),
+		SMTPMail:          viper.GetString("SMTP_USER"),
+		SMTPSecret:        viper.GetString("SMTP_SECRET"),
+		SMTPPort:          viper.GetInt("SMTP_PORT"),
+		RateLimit:         viper.GetInt("RATE_LIMIT"),
+		NRLicense:         viper.GetString("NR_LICENSE_KEY"),
+	}
 	return appConfig
 }
 
