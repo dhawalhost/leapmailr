@@ -21,7 +21,6 @@ func main() {
 	defer logger.Sync()
 
 	r := gin.New()
-	r.Use(middleware.NewRelicMiddleware())
 	r.Use(middleware.CorsMiddleware())
 	r.Use(middleware.LoggerMiddleware())
 	r.Use(gin.Recovery())
