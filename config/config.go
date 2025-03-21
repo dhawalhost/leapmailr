@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	appConfig AppConfig
+	appConfig *AppConfig
 )
 
 type AppConfig struct {
@@ -21,6 +21,7 @@ type AppConfig struct {
 	SMTPSecret string
 	SMTPPort   int
 	RateLimit  int
+	NRLicense  string
 }
 
 var (
@@ -29,25 +30,28 @@ var (
 )
 
 // Load configuration from environment file using Viper
-func LoadConfig() AppConfig {
+func LoadConfig() *AppConfig {
 	viper.SetConfigFile(".env")
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}
-	appConfig.Port = viper.GetString("PORT")
-	appConfig.DefaultSenderMail = viper.GetString("DEFAULT_SENDER_MAIL")
-	appConfig.CompanyName = viper.GetString("COMPANY_NAME")
-	appConfig.EnvMode = viper.GetString("ENV_MODE")
-	appConfig.ContactMail = viper.GetString("CONTACT_MAIL")
-	appConfig.LogoURL = viper.GetString("LOGO_URL")
-	appConfig.SMTPServer = viper.GetString("SMTP_SERVER_URL")
-	appConfig.SMTPMail = viper.GetString("SMTP_USER")
-	appConfig.SMTPSecret = viper.GetString("SMTP_SECRET")
-	appConfig.SMTPPort = viper.GetInt("SMTP_PORT")
-	appConfig.RateLimit = viper.GetInt("RATE_LIMIT")
+	appConfig = &AppConfig{
+		Port:              viper.GetString("PORT"),
+		DefaultSenderMail: viper.GetString("DEFAULT_SENDER_MAIL"),
+		CompanyName:       viper.GetString("COMPANY_NAME"),
+		EnvMode:           viper.GetString("ENV_MODE"),
+		ContactMail:       viper.GetString("CONTACT_MAIL"),
+		LogoURL:           viper.GetString("LOGO_URL"),
+		SMTPServer:        viper.GetString("SMTP_SERVER_URL"),
+		SMTPMail:          viper.GetString("SMTP_USER"),
+		SMTPSecret:        viper.GetString("SMTP_SECRET"),
+		SMTPPort:          viper.GetInt("SMTP_PORT"),
+		RateLimit:         viper.GetInt("RATE_LIMIT"),
+		NRLicense:         viper.GetString("NR_LICENSE_KEY"),
+	}
 	return appConfig
 }
 
-func GetConfig() AppConfig {
+func GetConfig() *AppConfig {
 	return appConfig
 }
