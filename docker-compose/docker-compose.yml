@@ -1,0 +1,89 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: leapmailr-postgres
+    environment:
+      POSTGRES_DB: leapmailr
+      POSTGRES_USER: leapmailr
+      POSTGRES_PASSWORD: leapmailr_secret_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - leapmailr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leapmailr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: leapmailr-backend
+    environment:
+      # Server
+      PORT: 8080
+      GIN_MODE: release
+      
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: leapmailr
+      DB_PASSWORD: leapmailr_secret_2024
+      DB_NAME: leapmailr
+      DB_SSLMODE: disable
+      
+      # JWT
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRY: 24h
+      REFRESH_TOKEN_EXPIRY: 168h
+      
+      # Rate Limiting
+      RATE_LIMIT_REQUESTS: 100
+      RATE_LIMIT_DURATION: 1m
+      
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - leapmailr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend UI
+  frontend:
+    build:
+      context: ../../leapmailr-ui
+      dockerfile: Dockerfile
+    container_name: leapmailr-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - leapmailr-network
+    restart: unless-stopped
+
+networks:
+  leapmailr-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

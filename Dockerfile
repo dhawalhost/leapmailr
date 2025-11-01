@@ -1,20 +1,47 @@
-# # Stage 1: Build the Go application
-FROM golang:1.25.1
+# Build stage
+FROM golang:1.22-alpine AS builder
 
-# Set the Current Working Directory inside the container
-WORKDIR /go/src/app
+# Install build dependencies
+RUN apk add --no-cache git
 
-# Copy everything from the current directory to the PWD (Present Working Directory) inside the container
-COPY . .
+# Set working directory
+WORKDIR /app
 
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
-# Build the Go app
-RUN go build -o main .
+# Copy source code
+COPY . .
 
-# This container exposes port 8080 to the outside world
-EXPOSE 3444
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o leapmailr .
 
-# Run the executable
-CMD ["./main"]
+# Runtime stage
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /root/
+
+# Copy the binary from builder
+COPY --from=builder /app/leapmailr .
+
+# Copy templates directory
+COPY --from=builder /app/templates ./templates
+
+# Copy static directory if it exists
+COPY --from=builder /app/static ./static
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables with defaults
+ENV PORT=8080
+# ENV GIN_MODE=release
+
+# Run the application
+CMD ["./leapmailr"]

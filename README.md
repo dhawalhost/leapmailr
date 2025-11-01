@@ -1,32 +1,238 @@
-# LeapMailr
-
-Automate the process of sending user inquiries from website 'Contact Us' forms to the intended recipients through secure email.
+# LeapMailr - Professional Email Service Platform
 
 ![LeapMailr](static/leapmailr.png)
 
+## Overview
 
-## Description
-LeapMailr is a tool that helps businesses manage user inquiries from their website's 'Contact Us' forms. When a user submits a message through a website's 'Contact Us' form, LeapMailr captures the inquiry and securely transmits it to the intended recipient's email inbox. This process is automated, so there's no need for manual intervention or forwarding of messages.
+LeapMailr is a powerful email service platform that enables developers and businesses to send transactional emails with ease. Built with Go and featuring a modern web dashboard, LeapMailr provides a complete solution for managing email delivery, templates, and analytics.
 
-LeapMailr ensures that the email transmission is secure, protecting sensitive information from being intercepted or compromised during transmission. This is especially important for businesses that handle confidential information, such as financial institutions, healthcare providers, and legal firms.
+## What LeapMailr Does
 
-By using LeapMailr, businesses can streamline their communication process, reduce response times, and improve customer satisfaction. It also helps ensure that inquiries are directed to the appropriate recipient, reducing the risk of messages being overlooked or lost in email threads.
+**Email Delivery Made Simple**
+- Send transactional emails through a REST API or web dashboard
+- Support for multiple email providers (SMTP, SendGrid, Mailgun, Amazon SES)
+- Automatic failover between providers for maximum reliability
+- Bulk email sending with personalization
+
+**Template Management**
+- Create and manage HTML email templates with dynamic variables
+- Version control for your templates
+- Visual template editor with live preview
+- Template testing before deployment
+
+**Analytics & Monitoring**
+- Real-time email delivery tracking
+- Detailed analytics on open rates, click rates, and delivery status
+- Performance metrics and insights
+- Email history and logs
+
+**Developer-Friendly**
+- RESTful API with comprehensive documentation
+- JWT-based authentication
+- API key management
+- Rate limiting and security features
+- Webhook notifications for email events
+
+**Modern Dashboard**
+- Beautiful, responsive web interface
+- Real-time statistics and charts
+- Template editor with code and preview modes
+- User and organization management
+- Role-based access control
+
+## Key Features
+
+✨ **Multi-Provider Support** - Integrate with SMTP, SendGrid, Mailgun, or Amazon SES  
+🔒 **Secure Authentication** - JWT tokens with refresh mechanism  
+📊 **Advanced Analytics** - Track delivery rates, opens, and clicks  
+🎨 **Template System** - Dynamic templates with variable substitution  
+⚡ **High Performance** - Built with Go for speed and efficiency  
+🔄 **Automatic Failover** - Switch providers automatically if one fails  
+📧 **Bulk Sending** - Send thousands of personalized emails  
+🎯 **Rate Limiting** - Protect your infrastructure  
+📱 **Responsive Dashboard** - Works on desktop and mobile  
+🔐 **API Keys** - Secure programmatic access  
 
 ## Getting Started
-To get started with LeapMailr, simply sign up for an account and follow the instructions to integrate it with your website's 'Contact Us' form.
 
-## Prerequisites
-To use LeapMailr, you will need:
+### Quick Start with Docker
 
-A website with a 'Contact Us' form
-An email address to receive inquiries, SMTP server setup and it's credentials.
+The fastest way to get LeapMailr running:
 
-<!-- 
-# Installing
-LeapMailr can be easily integrated with your website's 'Contact Us' form using our simple API. -->
+```bash
+# Clone the repository
+git clone <your-repo>
+cd leapmailr/docker-compose
 
-## Using
-Once LeapMailr is integrated with your website's 'Contact Us' form, it will automatically capture and transmit inquiries to the intended recipient's email inbox.
+# Run the setup script
+# Windows:
+docker-setup.bat
+
+# Linux/Mac:
+chmod +x docker-setup.sh
+./docker-setup.sh
+
+# Access the dashboard
+# http://localhost:3000
+```
+
+See [docker-compose/DOCKER-QUICKSTART.md](docker-compose/DOCKER-QUICKSTART.md) for detailed instructions.
+
+### Manual Installation
+
+#### Prerequisites
+
+- Go 1.22 or higher
+- PostgreSQL 15+
+- Node.js 18+ (for the dashboard)
+
+#### Backend Setup
+
+```bash
+# Install dependencies
+go mod download
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your settings
+
+# Run migrations
+go run main.go migrate
+
+# Start the server
+go run main.go
+```
+
+#### Frontend Setup
+
+```bash
+cd ../leapmailr-ui
+
+# Install dependencies
+npm install
+
+# Configure environment
+echo "NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1" > .env.local
+
+# Start development server
+npm run dev
+```
+
+## Configuration
+
+LeapMailr is configured through environment variables. Key settings:
+
+### Email Services
+
+Email providers (SMTP, SendGrid, Mailgun, etc.) are now configured through the Email Service API endpoints after authentication. No environment variables are required for email configuration.
+
+Use the `/api/v1/email-services` endpoints to:
+- Create and manage email service configurations
+- Set default email service for your account
+- Test email service connectivity
+
+### Database
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=leapmailr
+DB_PASSWORD=your-password
+DB_NAME=leapmailr
+```
+
+### Security
+```env
+JWT_SECRET=your-secret-key-minimum-32-characters
+JWT_EXPIRY=24h
+REFRESH_TOKEN_EXPIRY=168h
+```
+
+## Using LeapMailr
+
+### Web Dashboard
+
+1. **Create an Account**
+   - Visit http://localhost:3000
+   - Click "Get Started" and fill in your details
+   - Login with your credentials
+
+2. **Create Email Templates**
+   - Navigate to Dashboard > Templates
+   - Click "New Template"
+   - Design your email with HTML and variables
+   - Save and test
+
+3. **Send Emails**
+   - Go to Dashboard > Send Email
+   - Select a template
+   - Add recipients
+   - Fill in template variables
+   - Send immediately or schedule
+
+4. **Monitor Performance**
+   - Dashboard > Analytics
+   - View delivery statistics
+   - Track engagement metrics
+   - Export data for analysis
+
+### API Usage
+
+**Authentication**
+```bash
+# Register
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword",
+    "first_name": "John",
+    "last_name": "Doe"
+  }'
+
+# Login
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword"
+  }'
+```
+
+**Send Email**
+```bash
+curl -X POST http://localhost:8080/api/v1/emails/send \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_id": "template-uuid",
+    "to": "recipient@example.com",
+    "subject": "Welcome to Our Platform",
+    "parameters": {
+      "name": "John Doe",
+      "verification_link": "https://example.com/verify"
+    }
+  }'
+```
+
+**Bulk Send**
+```bash
+curl -X POST http://localhost:8080/api/v1/emails/bulk \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_id": "template-uuid",
+    "recipients": [
+      {
+        "email": "user1@example.com",
+        "parameters": {"name": "User One"}
+      },
+      {
+        "email": "user2@example.com",
+        "parameters": {"name": "User Two"}
+      }
+    ]
+  }'
+```
 
 ## Contributing
 We welcome contributions to LeapMailr! If you have an idea for improving the service, please open an issue or submit a pull request.

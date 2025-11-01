@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrzap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -26,12 +25,13 @@ func InitLogger() *zap.Logger {
 		zap.InfoLevel,
 	)
 
-	backgroundCore, err := nrzap.WrapBackgroundCore(core, AddNewRelic())
-	if err != nil && err != nrzap.ErrNilApp {
-		panic(err)
-	}
+	// backgroundCore, err := nrzap.WrapBackgroundCore(core, AddNewRelic())
+	// if err != nil && err != nrzap.ErrNilApp {
+	// 	panic(err)
+	// }
 
-	logger := zap.New(backgroundCore)
+	logger := zap.New(core)
+	// logger := zap.New(backgroundCore)
 	zap.ReplaceGlobals(logger)
 	return logger
 }

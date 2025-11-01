@@ -16,12 +16,25 @@ type AppConfig struct {
 	ContactMail       string `mapstructure:"CONTACT_MAIL"`
 	LogoURL           string `mapstructure:"LOGO_URL"`
 
-	SMTPServer string `mapstructure:"SMTP_SERVER_URL"`
-	SMTPMail   string `mapstructure:"SMTP_USER"`
-	SMTPSecret string `mapstructure:"SMTP_SECRET"`
-	SMTPPort   int    `mapstructure:"SMTP_PORT"`
-	RateLimit  int    `mapstructure:"RATE_LIMIT"`
-	NRLicense  string `mapstructure:"NR_LICENSE_KEY"`
+	// Database Configuration
+	DBHost     string `mapstructure:"DB_HOST"`
+	DBUser     string `mapstructure:"DB_USER"`
+	DBPassword string `mapstructure:"DB_PASSWORD"`
+	DBName     string `mapstructure:"DB_NAME"`
+	DBPort     int    `mapstructure:"DB_PORT"`
+	DBSSLMode  string `mapstructure:"DB_SSLMODE"`
+	DBTimezone string `mapstructure:"DB_TIMEZONE"`
+
+	// JWT Configuration
+	JWTSecret          string `mapstructure:"JWT_SECRET"`
+	JWTExpirationHours int    `mapstructure:"JWT_EXPIRATION_HOURS"`
+	JWTRefreshDays     int    `mapstructure:"JWT_REFRESH_DAYS"`
+
+	// Rate Limiting
+	RateLimit int `mapstructure:"RATE_LIMIT"`
+
+	// External Services
+	NRLicense string `mapstructure:"NR_LICENSE_KEY"`
 }
 
 // Load configuration from environment file using Viper
@@ -38,12 +51,24 @@ func LoadConfig() *AppConfig {
 		EnvMode:           viper.GetString("ENV_MODE"),
 		ContactMail:       viper.GetString("CONTACT_MAIL"),
 		LogoURL:           viper.GetString("LOGO_URL"),
-		SMTPServer:        viper.GetString("SMTP_SERVER_URL"),
-		SMTPMail:          viper.GetString("SMTP_USER"),
-		SMTPSecret:        viper.GetString("SMTP_SECRET"),
-		SMTPPort:          viper.GetInt("SMTP_PORT"),
-		RateLimit:         viper.GetInt("RATE_LIMIT"),
-		NRLicense:         viper.GetString("NR_LICENSE_KEY"),
+
+		// Database
+		DBHost:     viper.GetString("DB_HOST"),
+		DBUser:     viper.GetString("DB_USER"),
+		DBPassword: viper.GetString("DB_PASSWORD"),
+		DBName:     viper.GetString("DB_NAME"),
+		DBPort:     viper.GetInt("DB_PORT"),
+		DBSSLMode:  viper.GetString("DB_SSLMODE"),
+		DBTimezone: viper.GetString("DB_TIMEZONE"),
+
+		// JWT
+		JWTSecret:          viper.GetString("JWT_SECRET"),
+		JWTExpirationHours: viper.GetInt("JWT_EXPIRATION_HOURS"),
+		JWTRefreshDays:     viper.GetInt("JWT_REFRESH_DAYS"),
+
+		// Rate Limiting & Services
+		RateLimit: viper.GetInt("RATE_LIMIT"),
+		NRLicense: viper.GetString("NR_LICENSE_KEY"),
 	}
 	return appConfig
 }
