@@ -1,8 +1,8 @@
-# Build stage
-FROM golang:1.22-alpine AS builder
+# Multi-stage build for LeapMailr Backend
+FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates tzdata
 
 # Set working directory
 WORKDIR /app
@@ -17,31 +17,40 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o leapmailr .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o leapmailr .
 
-# Runtime stage
+# Final stage - minimal runtime image
 FROM alpine:latest
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates tzdata
 
-WORKDIR /root/
+# Create non-root user
+RUN addgroup -g 1000 leapmailr && \
+    adduser -D -u 1000 -G leapmailr leapmailr
 
-# Copy the binary from builder
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder
 COPY --from=builder /app/leapmailr .
 
-# Copy templates directory
+# Copy necessary files
 COPY --from=builder /app/templates ./templates
-
-# Copy static directory if it exists
 COPY --from=builder /app/static ./static
+
+# Change ownership
+RUN chown -R leapmailr:leapmailr /app
+
+# Switch to non-root user
+USER leapmailr
 
 # Expose port
 EXPOSE 8080
 
-# Set environment variables with defaults
-ENV PORT=8080
-# ENV GIN_MODE=release
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/v1/health || exit 1
 
 # Run the application
 CMD ["./leapmailr"]

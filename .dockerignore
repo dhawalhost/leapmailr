@@ -1,48 +1,47 @@
-# Binaries
+# Ignore Git files
+.git
+.github
+.gitignore
+
+# Ignore build artifacts
 *.exe
-*.exe~
 *.dll
 *.so
 *.dylib
 leapmailr
-leapmailr.exe
+leapmailr-*
 
-# Test binary
+# Ignore test files
+*_test.go
+coverage.out
 *.test
 
-# Output of the go coverage tool
-*.out
+# Ignore documentation
+docs/
+*.md
+README.md
+LICENSE
 
-# Dependency directories
-vendor/
-
-# Go workspace file
-go.work
-
-# Environment files
+# Ignore environment files
 .env
-.env.local
-.env.*.local
+.env.*
+config.env.example
 
-# IDE
+# Ignore logs
+*.log
+application.log
+
+# Ignore deployment files
+deployment/
+scripts/
+
+# Ignore IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# Ignore OS files
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Temporary files
-tmp/
-temp/

@@ -1,0 +1,46 @@
+# LeapMailr Backend Systemd Service
+# Place this file at: /etc/systemd/system/leapmailr.service
+
+[Unit]
+Description=LeapMailr Email Service Backend
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=leapmailr
+Group=leapmailr
+WorkingDirectory=/opt/leapmailr
+
+# Environment variables
+Environment="GIN_MODE=release"
+Environment="PORT=8080"
+EnvironmentFile=/opt/leapmailr/.env
+
+# Binary execution
+ExecStart=/opt/leapmailr/leapmailr
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=200
+StartLimitBurst=5
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/leapmailr
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=leapmailr
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
