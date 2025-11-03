@@ -46,10 +46,40 @@ EOF
     echo -e "${GREEN}✓ .env file created${NC}"
 fi
 
-# Start services with docker-compose
+# Check if PostgreSQL container already exists and is running
 echo ""
-echo "🚀 Starting services..."
-docker-compose up -d
+echo "🔍 Checking PostgreSQL status..."
+POSTGRES_EXISTS=$(docker ps -a --format '{{.Names}}' | grep '^leapmailr-postgres$' || echo "")
+POSTGRES_RUNNING=$(docker ps --format '{{.Names}}' | grep '^leapmailr-postgres$' || echo "")
+
+if [ -n "$POSTGRES_EXISTS" ]; then
+    if [ -n "$POSTGRES_RUNNING" ]; then
+        echo -e "${GREEN}✓ PostgreSQL is already running${NC}"
+    else
+        echo -e "${YELLOW}⚠️  PostgreSQL container exists but is stopped, starting...${NC}"
+        docker start leapmailr-postgres
+        echo -e "${GREEN}✓ PostgreSQL started${NC}"
+        sleep 3
+    fi
+else
+    echo "📦 Creating new PostgreSQL container..."
+    docker-compose up -d postgres
+    echo -e "${GREEN}✓ PostgreSQL created${NC}"
+    sleep 5
+fi
+
+# Remove existing backend container if it exists
+BACKEND_EXISTS=$(docker ps -a --format '{{.Names}}' | grep '^leapmailr-backend$' || echo "")
+if [ -n "$BACKEND_EXISTS" ]; then
+    echo ""
+    echo "🔄 Removing existing backend container..."
+    docker rm -f leapmailr-backend
+fi
+
+# Start/update backend service
+echo ""
+echo "🚀 Starting backend service..."
+docker-compose up -d --no-deps backend
 
 echo ""
 echo "⏳ Waiting for services to be healthy..."
@@ -60,7 +90,7 @@ echo ""
 echo "🏥 Health checks..."
 
 # Backend health
-if curl -f http://localhost:8080/api/v1/health &> /dev/null; then
+if curl -f --max-time 2 http://localhost:8080/health &> /dev/null; then
     echo -e "${GREEN}✓ Backend is healthy${NC}"
 else
     echo -e "${YELLOW}⚠️  Backend health check failed${NC}"
@@ -77,7 +107,7 @@ echo "✅ Deployment complete!"
 echo ""
 echo "Access your application:"
 echo "  Backend API:  http://localhost:8080"
-echo "  API Health:   http://localhost:8080/api/v1/health"
+echo "  API Health:   http://localhost:8080/health"
 echo "  Database:     localhost:5432"
 echo ""
 echo "Useful commands:"

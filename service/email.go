@@ -79,8 +79,8 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 		UserID:     &userID,
 		TemplateID: &emailTemplate.ID,
 		ServiceID:  &emailService.ID,
-		FromEmail:  getFromEmail(req.FromEmail, emailService),
-		FromName:   getFromName(req.FromName, emailService),
+		FromEmail:  getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService),
+		FromName:   getFromNameWithTemplate(req.FromName, emailTemplate, emailService),
 		ToEmail:    req.ToEmail,
 		ToName:     req.ToName,
 		Subject:    subject,
@@ -102,7 +102,7 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 
 	// Send email now
 	log.Printf("Attempting to send email to %s via service %s", emailLog.ToEmail, emailService.Name)
-	err = s.sendEmailViaSMTP(emailService, emailLog, htmlContent, textContent, req.Attachments)
+	err = s.sendEmailViaSMTP(emailService, emailTemplate, emailLog, htmlContent, textContent, req.Attachments)
 	if err != nil {
 		log.Printf("Failed to send email: %v", err)
 		emailLog.Status = "failed"
@@ -116,6 +116,18 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 	emailLog.SentAt = &time.Time{}
 	*emailLog.SentAt = time.Now()
 	s.db.Save(&emailLog)
+
+	// Send auto-reply if enabled (template-based or request override)
+	autoReplyTemplateID := emailTemplate.AutoReplyTemplateID
+	if req.AutoReplyEnabled && req.AutoReplyTemplateID != nil {
+		// Request-level override
+		autoReplyTemplateID = req.AutoReplyTemplateID
+	}
+
+	if emailTemplate.AutoReplyEnabled && autoReplyTemplateID != nil {
+		log.Printf("Auto-reply enabled for template %s, sending auto-reply using template %s", emailTemplate.Name, *autoReplyTemplateID)
+		go s.sendAutoReply(emailService, *autoReplyTemplateID, req.ToEmail, req.ToName, userID)
+	}
 
 	return &emailLog, nil
 }
@@ -179,8 +191,8 @@ func (s *EmailService) SendBulkEmail(req models.BulkEmailRequest, userID uuid.UU
 			UserID:     &userID,
 			TemplateID: &emailTemplate.ID,
 			ServiceID:  &emailService.ID,
-			FromEmail:  getFromEmail(req.FromEmail, emailService),
-			FromName:   getFromName(req.FromName, emailService),
+			FromEmail:  getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService),
+			FromName:   getFromNameWithTemplate(req.FromName, emailTemplate, emailService),
 			ToEmail:    recipient.Email,
 			ToName:     recipient.Name,
 			Subject:    subject,
@@ -204,7 +216,7 @@ func (s *EmailService) SendBulkEmail(req models.BulkEmailRequest, userID uuid.UU
 
 		// Send email (in production, this should be queued)
 		go func(log models.EmailLog, html, text string) {
-			err := s.sendEmailViaSMTP(emailService, log, html, text, nil)
+			err := s.sendEmailViaSMTP(emailService, emailTemplate, log, html, text, nil)
 			if err != nil {
 				log.Status = "failed"
 				log.ErrorMessage = err.Error()
@@ -250,16 +262,15 @@ func (s *EmailService) processTemplate(tmpl models.Template, params map[string]i
 			return "", "", fmt.Errorf("failed to execute text template: %w", err)
 		}
 		textContent = textBuffer.String()
-	} else if htmlContent != "" {
-		// Generate simple text version from HTML if no text template exists
-		textContent = stripHTML(htmlContent)
 	}
+	// Note: We don't auto-generate text from HTML anymore
+	// Only send HTML version for better formatting
 
 	return htmlContent, textContent, nil
 }
 
 // sendEmailViaSMTP sends email via SMTP
-func (s *EmailService) sendEmailViaSMTP(service models.EmailService, emailLog models.EmailLog, htmlContent, textContent string, attachments []models.EmailAttachment) error {
+func (s *EmailService) sendEmailViaSMTP(service models.EmailService, template models.Template, emailLog models.EmailLog, htmlContent, textContent string, attachments []models.EmailAttachment) error {
 	// Parse configuration
 	config := parseSMTPConfig(service.Configuration)
 
@@ -324,11 +335,9 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, emailLog mo
 		log.Printf("Authentication successful")
 	}
 
-	// Set sender - use from_email from config if available
+	// Set sender - use the from_email configured in the service (NOT from SMTP config)
+	// The emailLog.FromEmail already contains the correct sender email from service.FromEmail
 	fromEmail := emailLog.FromEmail
-	if config.FromEmail != "" {
-		fromEmail = config.FromEmail
-	}
 	log.Printf("Setting sender: %s", fromEmail)
 	if err := client.Mail(fromEmail); err != nil {
 		return fmt.Errorf("failed to set sender: %w", err)
@@ -341,7 +350,7 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, emailLog mo
 	}
 
 	// Compose message
-	message := composeMessage(emailLog, htmlContent, textContent, attachments)
+	message := composeMessage(template, service, emailLog, htmlContent, textContent, attachments)
 	log.Printf("Composed message: %d bytes", len(message))
 
 	// Send message
@@ -360,15 +369,133 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, emailLog mo
 	return nil
 }
 
+// sendAutoReply sends an automated reply email
+func (s *EmailService) sendAutoReply(service models.EmailService, autoReplyTemplateID uuid.UUID, toEmail, toName string, userID uuid.UUID) {
+	// Get the auto-reply template
+	var autoReplyTemplate models.Template
+	if err := s.db.Where("id = ?", autoReplyTemplateID).First(&autoReplyTemplate).Error; err != nil {
+		log.Printf("Failed to load auto-reply template %s: %v", autoReplyTemplateID, err)
+		return
+	}
+
+	// Prepare auto-reply parameters with common variables
+	autoReplyParams := map[string]interface{}{
+		"name":            toName,
+		"email":           toEmail,
+		"reference_id":    uuid.New().String()[:8], // Short reference ID
+		"received_date":   time.Now().Format("January 2, 2006 at 3:04 PM"),
+		"response_time":   "24-48",           // Default response time
+		"company_name":    "Your Company",    // Can be customized per service
+		"support_phone":   "+1-234-567-8900", // Can be customized
+		"website_url":     "https://yourcompany.com",
+		"help_center_url": "https://yourcompany.com/help",
+		"year":            time.Now().Year(),
+	}
+
+	// Process the auto-reply template
+	htmlContent, textContent, err := s.processTemplate(autoReplyTemplate, autoReplyParams, autoReplyTemplate.Subject)
+	if err != nil {
+		log.Printf("Failed to process auto-reply template: %v", err)
+		return
+	}
+
+	// Create email log for auto-reply
+	emailLog := models.EmailLog{
+		UserID:     &userID,
+		TemplateID: &autoReplyTemplate.ID,
+		ServiceID:  &service.ID,
+		FromEmail:  getFromEmailWithTemplate("", autoReplyTemplate, service),
+		FromName:   getFromNameWithTemplate("", autoReplyTemplate, service),
+		ToEmail:    toEmail,
+		ToName:     toName,
+		Subject:    autoReplyTemplate.Subject,
+		Status:     "queued",
+		Metadata:   `{"auto_reply": true}`,
+	}
+
+	if err := s.db.Create(&emailLog).Error; err != nil {
+		log.Printf("Failed to create email log for auto-reply: %v", err)
+		return
+	}
+
+	// Send the auto-reply email
+	log.Printf("Sending auto-reply to %s", toEmail)
+	err = s.sendEmailViaSMTP(service, autoReplyTemplate, emailLog, htmlContent, textContent, nil)
+	if err != nil {
+		log.Printf("Failed to send auto-reply: %v", err)
+		emailLog.Status = "failed"
+		emailLog.ErrorMessage = err.Error()
+		s.db.Save(&emailLog)
+		return
+	}
+
+	log.Printf("Auto-reply sent successfully to %s", toEmail)
+	emailLog.Status = "sent"
+	now := time.Now()
+	emailLog.SentAt = &now
+	s.db.Save(&emailLog)
+}
+
 // Helper functions
+// Priority: Request override > Template override > Service default > Fallback
+func getFromEmailWithTemplate(reqFromEmail string, template models.Template, service models.EmailService) string {
+	// 1st priority: Request override (for one-off changes)
+	if reqFromEmail != "" {
+		return reqFromEmail
+	}
+	// 2nd priority: Template override (configured in template)
+	if template.FromEmail != "" {
+		return template.FromEmail
+	}
+	// 3rd priority: Service's configured sender email
+	if service.FromEmail != "" {
+		return service.FromEmail
+	}
+	// Fallback
+	return "noreply@example.com"
+}
+
+func getFromNameWithTemplate(reqFromName string, template models.Template, service models.EmailService) string {
+	// 1st priority: Request override (for one-off changes)
+	if reqFromName != "" {
+		return reqFromName
+	}
+	// 2nd priority: Template override (configured in template)
+	if template.FromName != "" {
+		return template.FromName
+	}
+	// 3rd priority: Service's configured sender name
+	if service.FromName != "" {
+		return service.FromName
+	}
+	// Fallback
+	return "LeapMailr"
+}
+
+func getReplyToEmail(template models.Template, service models.EmailService) string {
+	// 1st priority: Template override
+	if template.ReplyToEmail != "" {
+		return template.ReplyToEmail
+	}
+	// 2nd priority: Service's configured reply-to
+	if service.ReplyToEmail != "" {
+		return service.ReplyToEmail
+	}
+	// Use from_email if no reply-to is set
+	if service.FromEmail != "" {
+		return service.FromEmail
+	}
+	return ""
+}
+
+// Backward compatibility - keep old functions for any existing code
 func getFromEmail(reqFromEmail string, service models.EmailService) string {
 	if reqFromEmail != "" {
 		return reqFromEmail
 	}
-	// Parse config to get from_email
-	config := parseSMTPConfig(service.Configuration)
-	if config.FromEmail != "" {
-		return config.FromEmail
+	// Use service's configured sender email (NOT the SMTP credentials email)
+	if service.FromEmail != "" {
+		return service.FromEmail
 	}
 	return "noreply@example.com"
 }
@@ -377,12 +504,9 @@ func getFromName(reqFromName string, service models.EmailService) string {
 	if reqFromName != "" {
 		return reqFromName
 	}
-	// Parse config to get from_name if available
-	var configMap map[string]interface{}
-	if err := json.Unmarshal([]byte(service.Configuration), &configMap); err == nil {
-		if fromName, ok := configMap["from_name"].(string); ok && fromName != "" {
-			return fromName
-		}
+	// Use service's configured sender name
+	if service.FromName != "" {
+		return service.FromName
 	}
 	return "LeapMailr"
 }
@@ -483,33 +607,37 @@ func parseSMTPConfig(config string) struct {
 	}
 }
 
-func composeMessage(log models.EmailLog, htmlContent, textContent string, attachments []models.EmailAttachment) string {
+func composeMessage(template models.Template, service models.EmailService, log models.EmailLog, htmlContent, textContent string, attachments []models.EmailAttachment) string {
 	var message bytes.Buffer
 
 	// Headers
 	message.WriteString(fmt.Sprintf("From: %s <%s>\r\n", log.FromName, log.FromEmail))
 	message.WriteString(fmt.Sprintf("To: %s <%s>\r\n", log.ToName, log.ToEmail))
+
+	// Add Reply-To header if configured (template override > service default)
+	replyTo := getReplyToEmail(template, service)
+	if replyTo != "" {
+		message.WriteString(fmt.Sprintf("Reply-To: %s\r\n", replyTo))
+	}
+
 	message.WriteString(fmt.Sprintf("Subject: %s\r\n", log.Subject))
 	message.WriteString("MIME-Version: 1.0\r\n")
 
-	if len(attachments) > 0 || (htmlContent != "" && textContent != "") {
-		// Multipart message
+	if len(attachments) > 0 {
+		// Multipart message with attachments
 		boundary := "boundary-" + uuid.New().String()
 		message.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=%s\r\n\r\n", boundary))
 
-		// Text part
-		if textContent != "" {
-			message.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-			message.WriteString("Content-Type: text/plain; charset=utf-8\r\n\r\n")
-			message.WriteString(textContent)
-			message.WriteString("\r\n\r\n")
-		}
-
-		// HTML part
+		// HTML part (prefer HTML over text)
 		if htmlContent != "" {
 			message.WriteString(fmt.Sprintf("--%s\r\n", boundary))
 			message.WriteString("Content-Type: text/html; charset=utf-8\r\n\r\n")
 			message.WriteString(htmlContent)
+			message.WriteString("\r\n\r\n")
+		} else if textContent != "" {
+			message.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+			message.WriteString("Content-Type: text/plain; charset=utf-8\r\n\r\n")
+			message.WriteString(textContent)
 			message.WriteString("\r\n\r\n")
 		}
 
@@ -525,7 +653,7 @@ func composeMessage(log models.EmailLog, htmlContent, textContent string, attach
 
 		message.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
 	} else {
-		// Simple message
+		// Simple message - send only HTML or only text, not both
 		if htmlContent != "" {
 			message.WriteString("Content-Type: text/html; charset=utf-8\r\n\r\n")
 			message.WriteString(htmlContent)

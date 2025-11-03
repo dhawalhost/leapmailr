@@ -50,6 +50,9 @@ func (s *EmailServiceManager) CreateEmailService(req models.CreateEmailServiceRe
 		Name:          req.Name,
 		Provider:      req.Provider,
 		Configuration: string(configJSON),
+		FromEmail:     req.FromEmail,
+		FromName:      req.FromName,
+		ReplyToEmail:  req.ReplyToEmail,
 		IsDefault:     req.IsDefault,
 		Status:        "active",
 	}
@@ -124,6 +127,18 @@ func (s *EmailServiceManager) UpdateEmailService(serviceID uuid.UUID, req models
 	// Update fields
 	if req.Name != "" {
 		service.Name = req.Name
+	}
+
+	if req.FromEmail != "" {
+		service.FromEmail = req.FromEmail
+	}
+
+	if req.FromName != "" {
+		service.FromName = req.FromName
+	}
+
+	if req.ReplyToEmail != "" {
+		service.ReplyToEmail = req.ReplyToEmail
 	}
 
 	if req.Configuration != nil {
@@ -299,8 +314,15 @@ If you received this email, your SMTP configuration is set up correctly and you 
 ---
 This is an automated test email from LeapMailr`, service.Name, service.Provider)
 
+	// Create a dummy template for test email (test emails don't use actual templates)
+	dummyTemplate := models.Template{
+		FromEmail:    service.FromEmail,
+		FromName:     service.FromName,
+		ReplyToEmail: service.ReplyToEmail,
+	}
+
 	// Send the email
-	err = emailService.sendEmailViaSMTP(service, emailLog, htmlContent, textContent, nil)
+	err = emailService.sendEmailViaSMTP(service, dummyTemplate, emailLog, htmlContent, textContent, nil)
 	if err != nil {
 		emailLog.Status = "failed"
 		emailLog.ErrorMessage = err.Error()
@@ -388,15 +410,23 @@ func (s *EmailServiceManager) GetDefaultService(userID uuid.UUID) (*models.Email
 
 func (s *EmailServiceManager) toResponse(service *models.EmailService) *models.EmailServiceResponse {
 	response := &models.EmailServiceResponse{
-		ID:        service.ID,
-		Name:      service.Name,
-		Provider:  service.Provider,
-		IsDefault: service.IsDefault,
-		Status:    service.Status,
-		LastError: service.LastError,
-		CreatedAt: service.CreatedAt,
-		UpdatedAt: service.UpdatedAt,
+		ID:           service.ID,
+		Name:         service.Name,
+		Provider:     service.Provider,
+		FromEmail:    service.FromEmail,
+		FromName:     service.FromName,
+		ReplyToEmail: service.ReplyToEmail,
+		IsDefault:    service.IsDefault,
+		Status:       service.Status,
+		LastError:    service.LastError,
+		CreatedAt:    service.CreatedAt,
+		UpdatedAt:    service.UpdatedAt,
 	}
+
+	// Add provider metadata (logo and color)
+	metadata := getProviderMetadata(service.Provider)
+	response.ProviderLogo = metadata.Logo
+	response.ProviderColor = metadata.Color
 
 	// Add safe config preview
 	var config map[string]interface{}
@@ -405,6 +435,52 @@ func (s *EmailServiceManager) toResponse(service *models.EmailService) *models.E
 	}
 
 	return response
+}
+
+// ProviderMetadata holds display metadata for each provider
+type ProviderMetadata struct {
+	Logo  string
+	Color string
+}
+
+// getProviderMetadata returns the logo SVG and brand color for each provider
+func getProviderMetadata(provider string) ProviderMetadata {
+	metadata := map[string]ProviderMetadata{
+		"smtp": {
+			Logo:  `<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 8l9 6 9-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+			Color: "#4A90E2",
+		},
+		"sendgrid": {
+			Logo:  `<svg viewBox="0 0 200 200" fill="currentColor"><path d="M50 50h33.33v33.33H50V50zm0 66.67h33.33V150H50v-33.33zm66.67-66.67H150v33.33h-33.33V50zm0 66.67H150V150h-33.33v-33.33zM50 116.67h33.33v-33.34H50v33.34zm66.67 0H150v-33.34h-33.33v33.34z"/></svg>`,
+			Color: "#1A82E2",
+		},
+		"mailgun": {
+			Logo:  `<svg viewBox="0 0 200 200" fill="currentColor"><circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" stroke-width="8"/><circle cx="100" cy="100" r="35"/><path d="M100 20v20m0 120v20m80-80h-20M20 100h20" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>`,
+			Color: "#F06B66",
+		},
+		"ses": {
+			Logo:  `<svg viewBox="0 0 200 200" fill="currentColor"><path d="M100 20L40 60v50l60 40 60-40V60L100 20z"/><path d="M100 80L60 100v40l40 25 40-25v-40L100 80z" opacity="0.6"/><path d="M55 115l-10 7 4 12 10-7-4-12m90-25l10-7-4-12-10 7 4 12M25 90l12 3 2-12-12-3-2 12m150 20l-12-3-2 12 12 3 2-12"/></svg>`,
+			Color: "#FF9900",
+		},
+		"postmark": {
+			Logo:  `<svg viewBox="0 0 200 200" fill="currentColor"><path d="M160 40H40c-8 0-16 8-16 16v88c0 8 8 16 16 16h120c8 0 16-8 16-16V56c0-8-8-16-16-16zm0 32l-60 40-60-40V56l60 40 60-40v16z"/><circle cx="100" cy="100" r="15" fill="white"/></svg>`,
+			Color: "#FFCC00",
+		},
+		"resend": {
+			Logo:  `<svg viewBox="0 0 200 200" fill="currentColor"><path d="M20 160l160-80-160-80v60l120 20-120 20v60z"/><path d="M140 100l-20 20v-40l20 20z" opacity="0.7"/></svg>`,
+			Color: "#000000",
+		},
+	}
+
+	if meta, ok := metadata[provider]; ok {
+		return meta
+	}
+
+	// Default fallback
+	return ProviderMetadata{
+		Logo:  `<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 8l9 6 9-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+		Color: "#4A90E2",
+	}
 }
 
 func (s *EmailServiceManager) createConfigPreview(provider string, config map[string]interface{}) map[string]string {
@@ -462,7 +538,8 @@ func (s *EmailServiceManager) createConfigPreview(provider string, config map[st
 func (s *EmailServiceManager) validateConfiguration(provider string, config map[string]interface{}) error {
 	switch provider {
 	case "smtp":
-		required := []string{"host", "port", "username", "password", "from_email"}
+		// from_email is now a separate field on EmailService, not in configuration
+		required := []string{"host", "port", "username", "password"}
 		for _, field := range required {
 			if _, ok := config[field]; !ok {
 				return fmt.Errorf("missing required field: %s", field)
@@ -470,7 +547,8 @@ func (s *EmailServiceManager) validateConfiguration(provider string, config map[
 		}
 
 	case "sendgrid":
-		required := []string{"api_key", "from_email"}
+		// from_email is now a separate field on EmailService, not in configuration
+		required := []string{"api_key"}
 		for _, field := range required {
 			if _, ok := config[field]; !ok {
 				return fmt.Errorf("missing required field: %s", field)
@@ -478,7 +556,8 @@ func (s *EmailServiceManager) validateConfiguration(provider string, config map[
 		}
 
 	case "mailgun":
-		required := []string{"domain", "api_key", "from_email"}
+		// from_email is now a separate field on EmailService, not in configuration
+		required := []string{"domain", "api_key"}
 		for _, field := range required {
 			if _, ok := config[field]; !ok {
 				return fmt.Errorf("missing required field: %s", field)
@@ -486,7 +565,8 @@ func (s *EmailServiceManager) validateConfiguration(provider string, config map[
 		}
 
 	case "ses":
-		required := []string{"region", "access_key", "secret_key", "from_email"}
+		// from_email is now a separate field on EmailService, not in configuration
+		required := []string{"region", "access_key", "secret_key"}
 		for _, field := range required {
 			if _, ok := config[field]; !ok {
 				return fmt.Errorf("missing required field: %s", field)
@@ -494,7 +574,8 @@ func (s *EmailServiceManager) validateConfiguration(provider string, config map[
 		}
 
 	case "postmark":
-		required := []string{"server_token", "from_email"}
+		// from_email is now a separate field on EmailService, not in configuration
+		required := []string{"server_token"}
 		for _, field := range required {
 			if _, ok := config[field]; !ok {
 				return fmt.Errorf("missing required field: %s", field)
@@ -502,7 +583,8 @@ func (s *EmailServiceManager) validateConfiguration(provider string, config map[
 		}
 
 	case "resend":
-		required := []string{"api_key", "from_email"}
+		// from_email is now a separate field on EmailService, not in configuration
+		required := []string{"api_key"}
 		for _, field := range required {
 			if _, ok := config[field]; !ok {
 				return fmt.Errorf("missing required field: %s", field)

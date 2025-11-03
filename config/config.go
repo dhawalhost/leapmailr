@@ -40,9 +40,9 @@ type AppConfig struct {
 // Load configuration from environment file using Viper
 func LoadConfig() *AppConfig {
 	viper.SetConfigFile(".env")
-	if err := viper.ReadInConfig(); err != nil {
-		panic(err)
-	}
+	// Try to read .env file, but don't panic if it doesn't exist
+	// Environment variables will be used instead (e.g., in Docker)
+	_ = viper.ReadInConfig() // Ignore error if .env doesn't exist
 	viper.AutomaticEnv()
 	appConfig = &AppConfig{
 		Port:              viper.GetString("PORT"),

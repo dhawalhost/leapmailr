@@ -31,15 +31,20 @@ func (s *TemplateService) CreateTemplate(req models.CreateTemplateRequest, userI
 	}
 
 	template := models.Template{
-		UserID:      &userID,
-		Name:        req.Name,
-		Description: req.Description,
-		Subject:     req.Subject,
-		HTMLContent: req.HTMLContent,
-		TextContent: req.TextContent,
-		Variables:   variables,
-		Version:     1,
-		IsActive:    true,
+		UserID:              &userID,
+		Name:                req.Name,
+		Description:         req.Description,
+		Subject:             req.Subject,
+		HTMLContent:         req.HTMLContent,
+		TextContent:         req.TextContent,
+		Variables:           variables,
+		FromEmail:           req.FromEmail,
+		FromName:            req.FromName,
+		ReplyToEmail:        req.ReplyToEmail,
+		AutoReplyEnabled:    req.AutoReplyEnabled,
+		AutoReplyTemplateID: req.AutoReplyTemplateID,
+		Version:             1,
+		IsActive:            true,
 	}
 
 	if err := s.db.Create(&template).Error; err != nil {
@@ -87,6 +92,21 @@ func (s *TemplateService) UpdateTemplate(templateID uuid.UUID, req models.Update
 	}
 	if req.Variables != "" {
 		template.Variables = req.Variables
+	}
+	if req.FromEmail != "" {
+		template.FromEmail = req.FromEmail
+	}
+	if req.FromName != "" {
+		template.FromName = req.FromName
+	}
+	if req.ReplyToEmail != "" {
+		template.ReplyToEmail = req.ReplyToEmail
+	}
+	if req.AutoReplyEnabled != nil {
+		template.AutoReplyEnabled = *req.AutoReplyEnabled
+	}
+	if req.AutoReplyTemplateID != nil {
+		template.AutoReplyTemplateID = req.AutoReplyTemplateID
 	}
 	if req.IsActive != nil {
 		template.IsActive = *req.IsActive

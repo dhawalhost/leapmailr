@@ -54,7 +54,7 @@ docker-compose up -d
 ### 4. Access the Application
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8080
-- API Health: http://localhost:8080/api/v1/health
+- API Health: http://localhost:8080/health
 
 ## CI/CD Pipeline
 

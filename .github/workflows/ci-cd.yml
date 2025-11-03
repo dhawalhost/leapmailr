@@ -145,7 +145,7 @@ jobs:
       - name: Health check
         run: |
           sleep 15
-          curl -f https://staging-api.leapmailr.com/api/v1/health || exit 1
+          curl -f https://staging-api.leapmailr.com/health || exit 1
 
   deploy-production:
     name: Deploy to Production
@@ -190,7 +190,7 @@ jobs:
       - name: Health check
         run: |
           sleep 15
-          curl -f https://api.leapmailr.com/api/v1/health || exit 1
+          curl -f https://api.leapmailr.com/health || exit 1
 
       - name: Notify deployment
         if: success()

@@ -571,6 +571,106 @@ If you weren't expecting this invitation, you can safely ignore this email.
 			},
 			PreviewImage: "/templates/previews/team-invitation.png",
 		},
+
+		// Auto-Reply Template
+		{
+			Name:        "Thank You - Auto Reply",
+			Description: "Automatic acknowledgment email for received messages",
+			Category:    "auto_reply",
+			Subject:     "Thank you for contacting us",
+			HTMLContent: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; line-height: 1.6; color: #333; background: #f4f4f4; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; padding: 40px 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 26px; }
+        .icon { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 15px; }
+        .content { padding: 40px 30px; }
+        .highlight-box { background: #F0FDF4; border-left: 4px solid #10B981; padding: 20px; border-radius: 6px; margin: 25px 0; }
+        .info-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #E5E7EB; }
+        .info-item:last-child { border-bottom: none; }
+        .label { color: #6B7280; font-weight: 500; }
+        .value { color: #111827; font-weight: 600; }
+        .footer { background: #F9FAFB; padding: 25px 30px; text-align: center; color: #6B7280; font-size: 13px; }
+        .footer a { color: #10B981; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">✓</div>
+            <h1>Message Received!</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">We've got your message</p>
+        </div>
+        <div class="content">
+            <p>Hi {{.name}},</p>
+            <p>Thank you for reaching out to us! This is an automated confirmation that we've successfully received your message.</p>
+            <div class="highlight-box">
+                <p style="margin: 0; color: #059669; font-weight: 600;">📬 What happens next?</p>
+                <p style="margin: 10px 0 0 0;">Our team will review your message and get back to you within {{.response_time}} business hours.</p>
+            </div>
+            <div style="margin: 25px 0;">
+                <div class="info-item">
+                    <span class="label">Reference ID:</span>
+                    <span class="value">{{.reference_id}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Received:</span>
+                    <span class="value">{{.received_date}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Your Email:</span>
+                    <span class="value">{{.email}}</span>
+                </div>
+            </div>
+            <p>In the meantime, feel free to explore our <a href="{{.help_center_url}}" style="color: #10B981; text-decoration: none;">Help Center</a> for instant answers to common questions.</p>
+            <p style="color: #6B7280; font-size: 14px; margin-top: 25px;">
+                <strong>Need urgent assistance?</strong><br>
+                Call us at {{.support_phone}} or visit our live chat at {{.website_url}}
+            </p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p>© {{.year}} {{.company_name}}. All rights reserved.</p>
+            <p><a href="{{.website_url}}">Visit our website</a> | <a href="{{.help_center_url}}">Help Center</a></p>
+        </div>
+    </div>
+</body>
+</html>`,
+			TextContent: `MESSAGE RECEIVED!
+
+Hi {{.name}},
+
+Thank you for reaching out to us! This is an automated confirmation that we've successfully received your message.
+
+📬 WHAT HAPPENS NEXT?
+Our team will review your message and get back to you within {{.response_time}} business hours.
+
+DETAILS:
+Reference ID: {{.reference_id}}
+Received: {{.received_date}}
+Your Email: {{.email}}
+
+In the meantime, feel free to explore our Help Center for instant answers to common questions: {{.help_center_url}}
+
+NEED URGENT ASSISTANCE?
+Call us at {{.support_phone}} or visit our live chat at {{.website_url}}
+
+---
+This is an automated message. Please do not reply to this email.
+
+© {{.year}} {{.company_name}}. All rights reserved.
+Visit our website: {{.website_url}}
+Help Center: {{.help_center_url}}`,
+			Variables: []string{
+				"name", "email", "reference_id", "received_date", "response_time",
+				"company_name", "support_phone", "website_url", "help_center_url", "year",
+			},
+			PreviewImage: "/templates/previews/auto-reply.png",
+		},
 	}
 }
 
