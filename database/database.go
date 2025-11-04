@@ -65,6 +65,7 @@ func runMigrations() error {
 		&models.APIKeyPair{},
 		&models.APIKeyUsageLog{},
 		&models.UserSession{},
+		&models.Project{},
 		&models.EmailService{},
 		&models.Template{},
 		&models.EmailLog{},

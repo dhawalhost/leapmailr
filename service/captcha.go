@@ -10,6 +10,7 @@ import (
 	"github.com/dhawalhost/leapmailr/database"
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -30,7 +31,7 @@ func (s *CaptchaService) CreateCaptchaConfig(req models.CreateCaptchaConfigReque
 		Provider:  req.Provider,
 		SiteKey:   req.SiteKey,
 		SecretKey: req.SecretKey, // This should be encrypted
-		Domains:   req.Domains,
+		Domains:   pq.StringArray(req.Domains),
 	}
 	if req.IsActive != nil {
 		newConfig.IsActive = *req.IsActive
@@ -44,7 +45,7 @@ func (s *CaptchaService) CreateCaptchaConfig(req models.CreateCaptchaConfigReque
 		ID:        newConfig.ID,
 		Provider:  newConfig.Provider,
 		SiteKey:   newConfig.SiteKey,
-		Domains:   newConfig.Domains,
+		Domains:   []string(newConfig.Domains),
 		IsActive:  newConfig.IsActive,
 		CreatedAt: newConfig.CreatedAt,
 		UpdatedAt: newConfig.UpdatedAt,
@@ -63,7 +64,7 @@ func (s *CaptchaService) ListCaptchaConfigs(userID uuid.UUID) ([]models.CaptchaC
 			ID:        config.ID,
 			Provider:  config.Provider,
 			SiteKey:   config.SiteKey,
-			Domains:   config.Domains,
+			Domains:   []string(config.Domains),
 			IsActive:  config.IsActive,
 			CreatedAt: config.CreatedAt,
 			UpdatedAt: config.UpdatedAt,
@@ -82,7 +83,7 @@ func (s *CaptchaService) GetCaptchaConfig(configID, userID uuid.UUID) (*models.C
 		ID:        config.ID,
 		Provider:  config.Provider,
 		SiteKey:   config.SiteKey,
-		Domains:   config.Domains,
+		Domains:   []string(config.Domains),
 		IsActive:  config.IsActive,
 		CreatedAt: config.CreatedAt,
 		UpdatedAt: config.UpdatedAt,
@@ -103,7 +104,7 @@ func (s *CaptchaService) UpdateCaptchaConfig(configID, userID uuid.UUID, req mod
 		config.SecretKey = req.SecretKey
 	}
 	if req.Domains != nil {
-		config.Domains = req.Domains
+		config.Domains = pq.StringArray(req.Domains)
 	}
 	if req.IsActive != nil {
 		config.IsActive = *req.IsActive
@@ -117,7 +118,7 @@ func (s *CaptchaService) UpdateCaptchaConfig(configID, userID uuid.UUID, req mod
 		ID:        config.ID,
 		Provider:  config.Provider,
 		SiteKey:   config.SiteKey,
-		Domains:   config.Domains,
+		Domains:   []string(config.Domains),
 		IsActive:  config.IsActive,
 		CreatedAt: config.CreatedAt,
 		UpdatedAt: config.UpdatedAt,

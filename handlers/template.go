@@ -168,6 +168,14 @@ func ListTemplatesHandler(c *gin.Context) {
 	// Parse query parameters for filters
 	var filters models.TemplateFilters
 
+	// Parse project_id if provided
+	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
+		projectID, err := uuid.Parse(projectIDStr)
+		if err == nil {
+			filters.ProjectID = &projectID
+		}
+	}
+
 	if isActiveStr := c.Query("is_active"); isActiveStr != "" {
 		if isActive, err := strconv.ParseBool(isActiveStr); err == nil {
 			filters.IsActive = &isActive

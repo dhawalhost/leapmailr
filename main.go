@@ -90,6 +90,18 @@ func main() {
 			protected.GET("/profile", handlers.ProfileHandler)
 			protected.POST("/auth/logout", handlers.LogoutHandler)
 
+			// Project management
+			projects := protected.Group("/projects")
+			{
+				projects.GET("/default", handlers.GetDefaultProject) // Must come before /:id
+				projects.POST("", handlers.CreateProject)
+				projects.GET("", handlers.GetProjects)
+				projects.GET("/:id", handlers.GetProject)
+				projects.PUT("/:id", handlers.UpdateProject)
+				projects.DELETE("/:id", handlers.DeleteProject)
+				projects.POST("/:id/default", handlers.SetDefaultProject)
+			}
+
 			// Email management
 			protected.GET("/emails", handlers.GetEmailHistoryHandler)
 			protected.GET("/emails/:id", handlers.GetEmailStatusHandler)

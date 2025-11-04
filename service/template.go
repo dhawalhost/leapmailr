@@ -32,6 +32,7 @@ func (s *TemplateService) CreateTemplate(req models.CreateTemplateRequest, userI
 
 	template := models.Template{
 		UserID:              &userID,
+		ProjectID:           req.ProjectID,
 		Name:                req.Name,
 		Description:         req.Description,
 		Subject:             req.Subject,
@@ -148,6 +149,11 @@ func (s *TemplateService) ListTemplates(userID uuid.UUID, filters models.Templat
 
 	query := s.db.Where("user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?)",
 		userID, userID)
+
+	// Filter by project ID if provided
+	if filters.ProjectID != nil {
+		query = query.Where("project_id = ?", *filters.ProjectID)
+	}
 
 	// Apply filters
 	if filters.IsActive != nil {

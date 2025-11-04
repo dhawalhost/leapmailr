@@ -70,6 +70,13 @@ func (s *AuthService) Register(req models.RegisterRequest) (*models.AuthResponse
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
+	// Create default project for the user
+	_, err = CreateProject(user.ID, "Default Project", "Your default project", "#3b82f6", true)
+	if err != nil {
+		// Log the error but don't fail registration
+		fmt.Printf("Warning: Failed to create default project for user %s: %v\n", user.Email, err)
+	}
+
 	// Generate tokens
 	accessToken, refreshToken, expiresIn, err := s.generateTokenPair(user.ID)
 	if err != nil {

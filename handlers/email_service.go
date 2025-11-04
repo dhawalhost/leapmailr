@@ -58,6 +58,14 @@ func ListEmailServicesHandler(c *gin.Context) {
 	filters.Provider = c.Query("provider")
 	filters.Status = c.Query("status")
 
+	// Parse project_id if provided
+	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
+		projectID, err := uuid.Parse(projectIDStr)
+		if err == nil {
+			filters.ProjectID = &projectID
+		}
+	}
+
 	// Parse limit and offset
 	if limit := c.Query("limit"); limit != "" {
 		var l int

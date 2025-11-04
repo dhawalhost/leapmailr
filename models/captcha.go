@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 // CaptchaProvider represents the type of CAPTCHA service
@@ -22,10 +24,11 @@ type CaptchaConfig struct {
 	Provider       CaptchaProvider `json:"provider" gorm:"not null"`
 	SiteKey        string          `json:"site_key" gorm:"not null"`
 	SecretKey      string          `json:"-" gorm:"not null"` // Encrypted secret key
-	Domains        []string        `json:"domains" gorm:"type:text[]"`
+	Domains        pq.StringArray  `json:"domains" gorm:"type:text[]"`
 	IsActive       bool            `json:"is_active" gorm:"default:true"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+	DeletedAt      gorm.DeletedAt  `json:"-" gorm:"index"`
 
 	// Relationships
 	User         *User         `json:"user,omitempty" gorm:"foreignKey:UserID"`

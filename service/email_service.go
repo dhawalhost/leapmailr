@@ -36,17 +36,27 @@ func (s *EmailServiceManager) CreateEmailService(req models.CreateEmailServiceRe
 		return nil, fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 
-	// If this is set as default, unset other defaults
+	// If this is set as default, unset other defaults (within the same project if projectID is provided)
 	if req.IsDefault {
-		if err := s.db.Model(&models.EmailService{}).
-			Where("user_id = ? AND is_default = ?", userID, true).
-			Update("is_default", false).Error; err != nil {
+		query := s.db.Model(&models.EmailService{}).
+			Where("user_id = ? AND is_default = ?", userID, true)
+
+		// If project_id is provided, only unset defaults within that project
+		if req.ProjectID != nil {
+			query = query.Where("project_id = ?", *req.ProjectID)
+		} else {
+			// If no project_id, unset defaults where project_id is NULL
+			query = query.Where("project_id IS NULL")
+		}
+
+		if err := query.Update("is_default", false).Error; err != nil {
 			return nil, fmt.Errorf("failed to unset previous default: %w", err)
 		}
 	}
 
 	emailService := models.EmailService{
 		UserID:        &userID,
+		ProjectID:     req.ProjectID,
 		Name:          req.Name,
 		Provider:      req.Provider,
 		Configuration: string(configJSON),
@@ -82,6 +92,10 @@ func (s *EmailServiceManager) GetEmailService(serviceID, userID uuid.UUID) (*mod
 func (s *EmailServiceManager) ListEmailServices(userID uuid.UUID, filters models.EmailServiceFilters) ([]models.EmailServiceResponse, error) {
 	var services []models.EmailService
 	query := s.db.Where("user_id = ?", userID)
+
+	if filters.ProjectID != nil {
+		query = query.Where("project_id = ?", *filters.ProjectID)
+	}
 
 	if filters.Provider != "" {
 		query = query.Where("provider = ?", filters.Provider)

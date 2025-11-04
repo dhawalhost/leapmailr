@@ -11,6 +11,7 @@ type EmailService struct {
 	ID             uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	UserID         *uuid.UUID `json:"user_id,omitempty" gorm:"type:uuid"`
 	OrganizationID *uuid.UUID `json:"organization_id,omitempty" gorm:"type:uuid"`
+	ProjectID      *uuid.UUID `json:"project_id,omitempty" gorm:"type:uuid;index"`
 	Name           string     `json:"name" gorm:"not null"`
 	Provider       string     `json:"provider" gorm:"not null"`   // smtp, sendgrid, mailgun, ses, etc.
 	Configuration  string     `json:"-" gorm:"type:jsonb"`        // Encrypted JSON config (SMTP credentials)
@@ -26,6 +27,7 @@ type EmailService struct {
 	// Relationships
 	User         *User         `json:"user,omitempty" gorm:"foreignKey:UserID"`
 	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrganizationID"`
+	Project      *Project      `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
 	EmailLogs    []EmailLog    `json:"email_logs,omitempty" gorm:"foreignKey:ServiceID"`
 }
 
@@ -34,6 +36,7 @@ type Template struct {
 	ID                  uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	UserID              *uuid.UUID `json:"user_id,omitempty" gorm:"type:uuid"`
 	OrganizationID      *uuid.UUID `json:"organization_id,omitempty" gorm:"type:uuid"`
+	ProjectID           *uuid.UUID `json:"project_id,omitempty" gorm:"type:uuid;index"`
 	Name                string     `json:"name" gorm:"not null"`
 	Description         string     `json:"description"`
 	Subject             string     `json:"subject"`
@@ -59,6 +62,7 @@ type Template struct {
 	// Relationships
 	User              *User         `json:"user,omitempty" gorm:"foreignKey:UserID"`
 	Organization      *Organization `json:"organization,omitempty" gorm:"foreignKey:OrganizationID"`
+	Project           *Project      `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
 	EmailLogs         []EmailLog    `json:"email_logs,omitempty" gorm:"foreignKey:TemplateID"`
 	AutoReplyTemplate *Template     `json:"auto_reply_template,omitempty" gorm:"foreignKey:AutoReplyTemplateID"`
 }
@@ -154,6 +158,7 @@ type WebhookEvent struct {
 
 // CreateTemplateRequest represents a request to create a template
 type CreateTemplateRequest struct {
+	ProjectID           *uuid.UUID `json:"project_id,omitempty"`
 	Name                string     `json:"name" binding:"required"`
 	Description         string     `json:"description,omitempty"`
 	Subject             string     `json:"subject" binding:"required"`
@@ -185,11 +190,12 @@ type UpdateTemplateRequest struct {
 
 // TemplateFilters represents filters for listing templates
 type TemplateFilters struct {
-	IsActive *bool  `json:"is_active,omitempty"`
-	Name     string `json:"name,omitempty"`
-	OrderBy  string `json:"order_by,omitempty"`
-	Limit    int    `json:"limit,omitempty"`
-	Offset   int    `json:"offset,omitempty"`
+	ProjectID *uuid.UUID `json:"project_id,omitempty"`
+	IsActive  *bool      `json:"is_active,omitempty"`
+	Name      string     `json:"name,omitempty"`
+	OrderBy   string     `json:"order_by,omitempty"`
+	Limit     int        `json:"limit,omitempty"`
+	Offset    int        `json:"offset,omitempty"`
 }
 
 // TemplateTestResult represents the result of testing a template
@@ -217,6 +223,7 @@ type TemplateVersion struct {
 
 // CreateEmailServiceRequest represents a request to create an email service
 type CreateEmailServiceRequest struct {
+	ProjectID     *uuid.UUID             `json:"project_id,omitempty"`
 	Name          string                 `json:"name" binding:"required"`
 	Provider      string                 `json:"provider" binding:"required,oneof=smtp sendgrid mailgun ses postmark resend"`
 	Configuration map[string]interface{} `json:"configuration" binding:"required"`
@@ -257,10 +264,11 @@ type EmailServiceResponse struct {
 
 // EmailServiceFilters represents filters for listing email services
 type EmailServiceFilters struct {
-	Provider string `json:"provider,omitempty"`
-	Status   string `json:"status,omitempty"`
-	Limit    int    `json:"limit,omitempty"`
-	Offset   int    `json:"offset,omitempty"`
+	ProjectID *uuid.UUID `json:"project_id,omitempty"`
+	Provider  string     `json:"provider,omitempty"`
+	Status    string     `json:"status,omitempty"`
+	Limit     int        `json:"limit,omitempty"`
+	Offset    int        `json:"offset,omitempty"`
 }
 
 // TestEmailServiceRequest represents a request to test an email service
