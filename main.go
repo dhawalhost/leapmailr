@@ -3,14 +3,21 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/dhawalhost/leapmailr/config"
 	"github.com/dhawalhost/leapmailr/database"
 	"github.com/dhawalhost/leapmailr/handlers"
 	"github.com/dhawalhost/leapmailr/logging"
 	"github.com/dhawalhost/leapmailr/middleware"
+	"github.com/dhawalhost/leapmailr/monitoring"
+	"github.com/dhawalhost/leapmailr/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -20,15 +27,46 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Initialize logger
+	// Initialize custom validator with enhanced rules (GAP-SEC-013)
+	customValidator := utils.NewCustomValidator()
+	binding.Validator = &validatorAdapter{validator: customValidator.Validator}
+
+	// Initialize monitoring metrics (GAP-AV-003)
+	monitoring.InitMetrics("1.0.0", conf.EnvMode)
+
+	// Update uptime metric every minute
+	go func() {
+		startTime := time.Now()
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			monitoring.AppUptimeSeconds.Set(time.Since(startTime).Seconds())
+		}
+	}()
+
+	// Initialize logger (GAP-SEC-009: Centralized structured logging)
 	logger := logging.InitLogger()
 	defer func() {
 		if err := logger.Sync(); err != nil {
 			fmt.Println(err)
 		}
 	}()
+
+	// Log startup information
+	logger.Info("Starting LeapMailR API Server",
+		zap.String("version", "1.0.0"),
+		zap.String("environment", conf.EnvMode),
+		zap.String("port", conf.Port),
+	)
+
 	if conf.EnvMode == "release" {
 		logger.Info("release mode")
+	}
+
+	// Initialize New Relic APM (optional - runs without it if not configured)
+	nrApp := logging.InitNewRelic(logger)
+	if nrApp != nil {
+		logger.Info("New Relic APM integration enabled")
 	}
 
 	// Initialize database
@@ -44,6 +82,18 @@ func main() {
 		fmt.Println("Default templates seeded successfully")
 	}
 
+	// Initialize health checks (GAP-AV-003)
+	handlers.InitializeHealthChecks()
+	fmt.Println("Health checks initialized")
+
+	// Initialize MFA service (GAP-SEC-001)
+	encryption, err := utils.NewEncryptionService()
+	if err != nil {
+		log.Fatalf("Failed to initialize encryption service: %v", err)
+	}
+	handlers.InitMFAService(encryption)
+	fmt.Println("MFA service initialized")
+
 	defer func() {
 		fmt.Println("Closing DB!!!")
 		if err := database.CloseDB(); err != nil {
@@ -53,12 +103,45 @@ func main() {
 
 	// Setup Gin router
 	r := gin.New()
-	r.Use(middleware.CorsMiddleware())
-	r.Use(middleware.LoggerMiddleware())
-	r.Use(gin.Recovery())
 
-	// Public routes
-	r.GET("/health", handlers.HandleHealthCheck)
+	// New Relic middleware (GAP-AV-003) - first in chain for full transaction tracking
+	r.Use(middleware.NewRelicMiddleware(nrApp))
+
+	// Metrics middleware (GAP-AV-003) - early in chain to measure all requests
+	r.Use(middleware.PrometheusMetrics())
+
+	// Structured logging middleware (GAP-SEC-009) - adds correlation IDs
+	r.Use(middleware.StructuredLogger())
+
+	// Security middlewares (GAP-SEC-011, GAP-SEC-012)
+	r.Use(middleware.RedirectToHTTPS(conf.EnvMode)) // Redirect HTTP to HTTPS
+	r.Use(middleware.SecurityHeaders())             // Add security headers (HSTS, CSP, etc.)
+	r.Use(middleware.CorsMiddleware(conf.EnvMode))  // Strict CORS with whitelist
+	r.Use(middleware.TrustedProxyHeaders())         // Handle proxy headers correctly
+	r.Use(gin.Recovery())                           // Panic recovery
+	r.Use(middleware.EnhancedRateLimiter(nil))      // Multi-tier rate limiting (GAP-SEC-010)
+
+	// Input validation and sanitization middlewares (GAP-SEC-013)
+	r.Use(middleware.ContentTypeValidator())     // Validate content-type headers
+	r.Use(middleware.InputSanitizer())           // Sanitize all inputs
+	r.Use(middleware.XSSProtection())            // Add XSS protection headers
+	r.Use(middleware.ValidateEmailAttachments()) // Validate email attachments
+
+	// CSRF protection middleware (GAP-SEC-014) - after auth, validates X-CSRF-Token header
+	r.Use(middleware.CSRFProtection())
+
+	// Request size limit (10MB for file uploads, adjust as needed)
+	r.Use(middleware.RequestSizeLimit(10 * 1024 * 1024))
+
+	// Public health and metrics routes (GAP-AV-003)
+	r.GET("/health", handlers.HandleHealthCheck)          // Detailed health check
+	r.GET("/health/ready", handlers.HandleReadinessCheck) // Kubernetes readiness probe
+	r.GET("/health/live", handlers.HandleLivenessCheck)   // Kubernetes liveness probe
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))      // Prometheus metrics endpoint
+
+	// Email tracking routes (public - no auth required for pixel and click tracking)
+	r.GET("/api/v1/track/open/:pixel_id", handlers.TrackOpenHandler)
+	r.GET("/api/v1/track/click/:pixel_id/:link_id", handlers.TrackClickHandler)
 
 	// API v1 routes
 	api := r.Group("/api/v1")
@@ -68,6 +151,8 @@ func main() {
 		{
 			auth.POST("/register", handlers.RegisterHandler)
 			auth.POST("/login", handlers.LoginHandler)
+			auth.POST("/login-mfa", handlers.LoginWithMFAHandler)                // MFA login (GAP-SEC-001)
+			auth.POST("/login-backup-code", handlers.LoginWithBackupCodeHandler) // Backup code login (GAP-SEC-001)
 			auth.POST("/refresh", handlers.RefreshTokenHandler)
 		}
 
@@ -169,6 +254,14 @@ func main() {
 				autoreplies.GET("/logs", handlers.GetAutoReplyLogsHandler)
 			}
 
+			// Email tracking and analytics
+			tracking := protected.Group("/analytics")
+			{
+				tracking.GET("/email/:email_id", handlers.GetEmailAnalyticsHandler)
+				tracking.GET("/email/:email_id/events", handlers.GetEmailTrackingEventsHandler)
+				tracking.GET("/campaign/:campaign_id", handlers.GetCampaignAnalyticsHandler)
+			}
+
 			// API Key Pair management (for SDK usage)
 			apikeys := protected.Group("/api-keys")
 			{
@@ -195,6 +288,16 @@ func main() {
 				contacts.POST("/import", handlers.ImportContactsHandler)
 			}
 
+			// Multi-Factor Authentication (GAP-SEC-001)
+			mfa := protected.Group("/mfa")
+			{
+				mfa.POST("/setup", handlers.SetupMFAHandler)                                // Start MFA setup
+				mfa.POST("/verify-setup", handlers.VerifyMFASetupHandler)                   // Complete MFA setup
+				mfa.POST("/disable", handlers.DisableMFAHandler)                            // Disable MFA
+				mfa.POST("/regenerate-backup-codes", handlers.RegenerateBackupCodesHandler) // Regenerate backup codes
+				mfa.GET("/status", handlers.GetMFAStatusHandler)                            // Get MFA status
+			}
+
 			// TODO: Add more protected routes for:
 			// - Analytics
 			// - Organization management
@@ -207,4 +310,17 @@ func main() {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 
+}
+
+// validatorAdapter adapts our custom validator to Gin's validator interface
+type validatorAdapter struct {
+	validator *validator.Validate
+}
+
+func (v *validatorAdapter) ValidateStruct(obj interface{}) error {
+	return v.validator.Struct(obj)
+}
+
+func (v *validatorAdapter) Engine() interface{} {
+	return v.validator
 }

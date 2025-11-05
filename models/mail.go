@@ -14,7 +14,7 @@ type EmailService struct {
 	ProjectID      *uuid.UUID `json:"project_id,omitempty" gorm:"type:uuid;index"`
 	Name           string     `json:"name" gorm:"not null"`
 	Provider       string     `json:"provider" gorm:"not null"`   // smtp, sendgrid, mailgun, ses, etc.
-	Configuration  string     `json:"-" gorm:"type:jsonb"`        // Encrypted JSON config (SMTP credentials)
+	Configuration  string     `json:"-" gorm:"type:text"`         // Encrypted JSON config (SMTP credentials) - stored as encrypted text
 	FromEmail      string     `json:"from_email" gorm:"not null"` // Sender email address (shown to recipients)
 	FromName       string     `json:"from_name"`                  // Sender name (shown to recipients)
 	ReplyToEmail   string     `json:"reply_to_email,omitempty"`   // Reply-to email address
@@ -28,7 +28,7 @@ type EmailService struct {
 	User         *User         `json:"user,omitempty" gorm:"foreignKey:UserID"`
 	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrganizationID"`
 	Project      *Project      `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
-	EmailLogs    []EmailLog    `json:"email_logs,omitempty" gorm:"foreignKey:ServiceID"`
+	EmailLogs    []EmailLog    `json:"email_logs,omitempty" gorm:"foreignKey:ServiceID;constraint:OnDelete:SET NULL"`
 }
 
 // Template represents an email template
@@ -99,48 +99,50 @@ type EmailLog struct {
 
 // EmailRequest represents a request to send an email
 type EmailRequest struct {
-	ServiceID      *uuid.UUID             `json:"service_id,omitempty"`
-	TemplateID     uuid.UUID              `json:"template_id" binding:"required"`
-	ToEmail        string                 `json:"to_email" binding:"required,email"`
-	ToName         string                 `json:"to_name,omitempty"`
-	FromEmail      string                 `json:"from_email,omitempty"`
-	FromName       string                 `json:"from_name,omitempty"`
-	Subject        string                 `json:"subject,omitempty"`
+	ServiceID      *uuid.UUID             `json:"service_id,omitempty" binding:"omitempty,uuid"`
+	TemplateID     uuid.UUID              `json:"template_id" binding:"required,uuid"`
+	ToEmail        string                 `json:"to_email" binding:"required,email,max=255"`
+	ToName         string                 `json:"to_name,omitempty" binding:"omitempty,max=255"`
+	FromEmail      string                 `json:"from_email,omitempty" binding:"omitempty,email,max=255"`
+	FromName       string                 `json:"from_name,omitempty" binding:"omitempty,max=255"`
+	Subject        string                 `json:"subject,omitempty" binding:"omitempty,max=500"`
 	TemplateParams map[string]interface{} `json:"template_params,omitempty"`
-	Attachments    []EmailAttachment      `json:"attachments,omitempty"`
+	Attachments    []EmailAttachment      `json:"attachments,omitempty" binding:"omitempty,max=10,dive"`
 	ScheduleAt     *time.Time             `json:"schedule_at,omitempty"`
-	Tags           []string               `json:"tags,omitempty"`
+	Tags           []string               `json:"tags,omitempty" binding:"omitempty,max=20,dive,max=50,alphanumunicode"`
+	EnableTracking bool                   `json:"enable_tracking" binding:"omitempty"` // Enable open and click tracking
 	// Auto-reply configuration (template-based)
 	AutoReplyEnabled    bool       `json:"auto_reply_enabled,omitempty"`
-	AutoReplyTemplateID *uuid.UUID `json:"auto_reply_template_id,omitempty"`
+	AutoReplyTemplateID *uuid.UUID `json:"auto_reply_template_id,omitempty" binding:"omitempty,uuid"`
 }
 
 // BulkEmailRequest represents a request to send bulk emails
 type BulkEmailRequest struct {
-	ServiceID     *uuid.UUID             `json:"service_id,omitempty"`
-	TemplateID    uuid.UUID              `json:"template_id" binding:"required"`
-	Recipients    []EmailRecipient       `json:"recipients" binding:"required,min=1"`
-	FromEmail     string                 `json:"from_email,omitempty"`
-	FromName      string                 `json:"from_name,omitempty"`
-	Subject       string                 `json:"subject,omitempty"`
-	DefaultParams map[string]interface{} `json:"default_params,omitempty"`
-	ScheduleAt    *time.Time             `json:"schedule_at,omitempty"`
-	Tags          []string               `json:"tags,omitempty"`
+	ServiceID      *uuid.UUID             `json:"service_id,omitempty" binding:"omitempty,uuid"`
+	TemplateID     uuid.UUID              `json:"template_id" binding:"required,uuid"`
+	Recipients     []EmailRecipient       `json:"recipients" binding:"required,min=1,max=1000,dive"`
+	FromEmail      string                 `json:"from_email,omitempty" binding:"omitempty,email,max=255"`
+	FromName       string                 `json:"from_name,omitempty" binding:"omitempty,max=255"`
+	Subject        string                 `json:"subject,omitempty" binding:"omitempty,max=500"`
+	DefaultParams  map[string]interface{} `json:"default_params,omitempty"`
+	ScheduleAt     *time.Time             `json:"schedule_at,omitempty"`
+	Tags           []string               `json:"tags,omitempty" binding:"omitempty,max=20,dive,max=50,alphanumunicode"`
+	EnableTracking bool                   `json:"enable_tracking" binding:"omitempty"` // Enable open and click tracking
 }
 
 // EmailRecipient represents a recipient in bulk email
 type EmailRecipient struct {
-	Email          string                 `json:"email" binding:"required,email"`
-	Name           string                 `json:"name,omitempty"`
+	Email          string                 `json:"email" binding:"required,email,max=255"`
+	Name           string                 `json:"name,omitempty" binding:"omitempty,max=255"`
 	TemplateParams map[string]interface{} `json:"template_params,omitempty"`
 }
 
 // EmailAttachment represents an email attachment
 type EmailAttachment struct {
-	Filename    string `json:"filename" binding:"required"`
-	ContentType string `json:"content_type"`
-	Content     []byte `json:"content" binding:"required"`
-	Size        int64  `json:"size"`
+	Filename    string `json:"filename" binding:"required,max=255"`
+	ContentType string `json:"content_type" binding:"omitempty,max=100"`
+	Content     []byte `json:"content" binding:"required,max=10485760"` // 10MB max
+	Size        int64  `json:"size" binding:"max=10485760"`             // 10MB max
 }
 
 // WebhookEvent represents a webhook event
@@ -158,34 +160,34 @@ type WebhookEvent struct {
 
 // CreateTemplateRequest represents a request to create a template
 type CreateTemplateRequest struct {
-	ProjectID           *uuid.UUID `json:"project_id,omitempty"`
-	Name                string     `json:"name" binding:"required"`
-	Description         string     `json:"description,omitempty"`
-	Subject             string     `json:"subject" binding:"required"`
-	HTMLContent         string     `json:"html_content,omitempty"`
-	TextContent         string     `json:"text_content,omitempty"`
-	Variables           string     `json:"variables,omitempty"` // JSON array of variable names
-	FromEmail           string     `json:"from_email,omitempty" binding:"omitempty,email"`
-	FromName            string     `json:"from_name,omitempty"`
-	ReplyToEmail        string     `json:"reply_to_email,omitempty" binding:"omitempty,email"`
+	ProjectID           *uuid.UUID `json:"project_id,omitempty" binding:"omitempty,uuid"`
+	Name                string     `json:"name" binding:"required,max=255,alphanumunicode"`
+	Description         string     `json:"description,omitempty" binding:"omitempty,max=1000"`
+	Subject             string     `json:"subject" binding:"required,max=500"`
+	HTMLContent         string     `json:"html_content,omitempty" binding:"omitempty,max=1048576"` // 1MB max
+	TextContent         string     `json:"text_content,omitempty" binding:"omitempty,max=524288"`  // 512KB max
+	Variables           string     `json:"variables,omitempty" binding:"omitempty,max=10000"`      // JSON array of variable names
+	FromEmail           string     `json:"from_email,omitempty" binding:"omitempty,email,max=255"`
+	FromName            string     `json:"from_name,omitempty" binding:"omitempty,max=255"`
+	ReplyToEmail        string     `json:"reply_to_email,omitempty" binding:"omitempty,email,max=255"`
 	AutoReplyEnabled    bool       `json:"auto_reply_enabled,omitempty"`
-	AutoReplyTemplateID *uuid.UUID `json:"auto_reply_template_id,omitempty"`
+	AutoReplyTemplateID *uuid.UUID `json:"auto_reply_template_id,omitempty" binding:"omitempty,uuid"`
 }
 
 // UpdateTemplateRequest represents a request to update a template
 type UpdateTemplateRequest struct {
-	Name                string     `json:"name,omitempty"`
-	Description         string     `json:"description,omitempty"`
-	Subject             string     `json:"subject,omitempty"`
-	HTMLContent         string     `json:"html_content,omitempty"`
-	TextContent         string     `json:"text_content,omitempty"`
-	Variables           string     `json:"variables,omitempty"`
+	Name                string     `json:"name,omitempty" binding:"omitempty,max=255,alphanumunicode"`
+	Description         string     `json:"description,omitempty" binding:"omitempty,max=1000"`
+	Subject             string     `json:"subject,omitempty" binding:"omitempty,max=500"`
+	HTMLContent         string     `json:"html_content,omitempty" binding:"omitempty,max=1048576"` // 1MB max
+	TextContent         string     `json:"text_content,omitempty" binding:"omitempty,max=524288"`  // 512KB max
+	Variables           string     `json:"variables,omitempty" binding:"omitempty,max=10000"`
 	IsActive            *bool      `json:"is_active,omitempty"`
-	FromEmail           string     `json:"from_email,omitempty" binding:"omitempty,email"`
-	FromName            string     `json:"from_name,omitempty"`
-	ReplyToEmail        string     `json:"reply_to_email,omitempty" binding:"omitempty,email"`
+	FromEmail           string     `json:"from_email,omitempty" binding:"omitempty,email,max=255"`
+	FromName            string     `json:"from_name,omitempty" binding:"omitempty,max=255"`
+	ReplyToEmail        string     `json:"reply_to_email,omitempty" binding:"omitempty,email,max=255"`
 	AutoReplyEnabled    *bool      `json:"auto_reply_enabled,omitempty"`
-	AutoReplyTemplateID *uuid.UUID `json:"auto_reply_template_id,omitempty"`
+	AutoReplyTemplateID *uuid.UUID `json:"auto_reply_template_id,omitempty" binding:"omitempty,uuid"`
 }
 
 // TemplateFilters represents filters for listing templates
@@ -223,23 +225,23 @@ type TemplateVersion struct {
 
 // CreateEmailServiceRequest represents a request to create an email service
 type CreateEmailServiceRequest struct {
-	ProjectID     *uuid.UUID             `json:"project_id,omitempty"`
-	Name          string                 `json:"name" binding:"required"`
+	ProjectID     *uuid.UUID             `json:"project_id,omitempty" binding:"omitempty,uuid"`
+	Name          string                 `json:"name" binding:"required,max=255,alphanumunicode"`
 	Provider      string                 `json:"provider" binding:"required,oneof=smtp sendgrid mailgun ses postmark resend"`
 	Configuration map[string]interface{} `json:"configuration" binding:"required"`
-	FromEmail     string                 `json:"from_email" binding:"required,email"`
-	FromName      string                 `json:"from_name,omitempty"`
-	ReplyToEmail  string                 `json:"reply_to_email,omitempty" binding:"omitempty,email"`
+	FromEmail     string                 `json:"from_email" binding:"required,email,max=255"`
+	FromName      string                 `json:"from_name,omitempty" binding:"omitempty,max=255"`
+	ReplyToEmail  string                 `json:"reply_to_email,omitempty" binding:"omitempty,email,max=255"`
 	IsDefault     bool                   `json:"is_default,omitempty"`
 }
 
 // UpdateEmailServiceRequest represents a request to update an email service
 type UpdateEmailServiceRequest struct {
-	Name          string                 `json:"name,omitempty"`
+	Name          string                 `json:"name,omitempty" binding:"omitempty,max=255,alphanumunicode"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	FromEmail     string                 `json:"from_email,omitempty" binding:"omitempty,email"`
-	FromName      string                 `json:"from_name,omitempty"`
-	ReplyToEmail  string                 `json:"reply_to_email,omitempty" binding:"omitempty,email"`
+	FromEmail     string                 `json:"from_email,omitempty" binding:"omitempty,email,max=255"`
+	FromName      string                 `json:"from_name,omitempty" binding:"omitempty,max=255"`
+	ReplyToEmail  string                 `json:"reply_to_email,omitempty" binding:"omitempty,email,max=255"`
 	IsDefault     *bool                  `json:"is_default,omitempty"`
 	Status        string                 `json:"status,omitempty" binding:"omitempty,oneof=active inactive"`
 }

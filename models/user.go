@@ -15,11 +15,24 @@ type User struct {
 	LastName      string    `json:"last_name"`
 	PlanType      string    `json:"plan_type" gorm:"default:'free'"` // free, professional, business, enterprise
 	APIKey        string    `json:"api_key" gorm:"uniqueIndex"`
-	PrivateKey    string    `json:"-"`
+	PrivateKey    string    `json:"-"` // Encrypted
 	IsActive      bool      `json:"is_active" gorm:"default:true"`
 	EmailVerified bool      `json:"email_verified" gorm:"default:false"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+
+	// Security - Account Lockout (GAP-SEC-003)
+	FailedLoginAttempts int        `json:"-" gorm:"default:0"`
+	LockedUntil         *time.Time `json:"-"`
+	LastLoginAttempt    *time.Time `json:"-"`
+	LastLoginSuccess    *time.Time `json:"last_login_success,omitempty"`
+
+	// Multi-Factor Authentication (GAP-SEC-001)
+	MFAEnabled     bool       `json:"mfa_enabled" gorm:"default:false"`
+	MFASecret      string     `json:"-"` // Encrypted TOTP secret
+	MFABackupCodes string     `json:"-"` // Encrypted JSON array of backup codes
+	MFAVerifiedAt  *time.Time `json:"mfa_verified_at,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Relationships
 	Organizations []Organization `json:"organizations,omitempty" gorm:"many2many:user_organizations;"`
@@ -101,18 +114,45 @@ type UserSession struct {
 	User User `json:"user" gorm:"foreignKey:UserID"`
 }
 
+// AuditLog represents security audit log (GAP-SEC-008)
+type AuditLog struct {
+	ID         uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	UserID     *uuid.UUID `json:"user_id,omitempty" gorm:"type:uuid;index"`
+	Action     string     `json:"action" gorm:"not null;index"` // login, logout, password_change, data_access, api_key_created, etc.
+	Resource   string     `json:"resource,omitempty"`           // user, email_service, template, etc.
+	ResourceID *uuid.UUID `json:"resource_id,omitempty" gorm:"type:uuid"`
+	IPAddress  string     `json:"ip_address"`
+	UserAgent  string     `json:"user_agent"`
+	Status     string     `json:"status" gorm:"not null"`              // success, failure
+	Details    string     `json:"details,omitempty" gorm:"type:jsonb"` // Additional context as JSON
+	Timestamp  time.Time  `json:"timestamp" gorm:"not null;index"`
+	CreatedAt  time.Time  `json:"created_at"`
+
+	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
+}
+
+// PasswordHistory stores hashed passwords for password reuse prevention (GAP-SEC-002)
+type PasswordHistory struct {
+	ID           uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	UserID       uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
+	PasswordHash string    `json:"-" gorm:"not null"`
+	CreatedAt    time.Time `json:"created_at"`
+
+	User User `json:"user" gorm:"foreignKey:UserID"`
+}
+
 // LoginRequest represents login credentials
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
+	Email    string `json:"email" binding:"required,email,max=255"`
+	Password string `json:"password" binding:"required,min=12,max=128"`
 }
 
 // RegisterRequest represents registration data
 type RegisterRequest struct {
-	Email     string `json:"email" binding:"required,email"`
-	Password  string `json:"password" binding:"required,min=6"`
-	FirstName string `json:"first_name" binding:"required"`
-	LastName  string `json:"last_name" binding:"required"`
+	Email     string `json:"email" binding:"required,email,max=255"`
+	Password  string `json:"password" binding:"required,min=12,max=128"`
+	FirstName string `json:"first_name" binding:"required,max=100,alphanumunicode"`
+	LastName  string `json:"last_name" binding:"required,max=100,alphanumunicode"`
 }
 
 // AuthResponse represents authentication response
@@ -130,27 +170,77 @@ type RefreshTokenRequest struct {
 
 // CreateAPIKeyRequest represents API key creation request
 type CreateAPIKeyRequest struct {
-	Name        string     `json:"name" binding:"required"`
-	Permissions []string   `json:"permissions"`
+	Name        string     `json:"name" binding:"required,max=100,alphanumunicode"`
+	Permissions []string   `json:"permissions" binding:"max=20,dive,oneof=read write admin email template contact"`
 	ExpiresAt   *time.Time `json:"expires_at"`
 }
 
 // UpdateUserRequest represents user update request
 type UpdateUserRequest struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email" binding:"omitempty,email"`
+	FirstName string `json:"first_name" binding:"omitempty,max=100,alphanumunicode"`
+	LastName  string `json:"last_name" binding:"omitempty,max=100,alphanumunicode"`
+	Email     string `json:"email" binding:"omitempty,email,max=255"`
 }
 
 // ChangePasswordRequest represents password change request
 type ChangePasswordRequest struct {
-	CurrentPassword string `json:"current_password" binding:"required"`
-	NewPassword     string `json:"new_password" binding:"required,min=6"`
+	CurrentPassword string `json:"current_password" binding:"required,min=12,max=128"`
+	NewPassword     string `json:"new_password" binding:"required,min=12,max=128"`
 }
 
 // InviteUserRequest represents user invitation request
 type InviteUserRequest struct {
-	Email          string    `json:"email" binding:"required,email"`
+	Email          string    `json:"email" binding:"required,email,max=255"`
 	Role           string    `json:"role" binding:"required,oneof=admin member viewer"`
-	OrganizationID uuid.UUID `json:"organization_id" binding:"required"`
+	OrganizationID uuid.UUID `json:"organization_id" binding:"required,uuid"`
+}
+
+// MFA Models (GAP-SEC-001)
+
+// MFASetupRequest represents MFA setup initiation request
+type MFASetupRequest struct {
+	Password string `json:"password" binding:"required,min=12,max=128"`
+}
+
+// MFASetupResponse represents MFA setup response with QR code data
+type MFASetupResponse struct {
+	Secret        string   `json:"secret"`           // For manual entry
+	QRCodeDataURL string   `json:"qr_code_data_url"` // Base64-encoded QR code image
+	BackupCodes   []string `json:"backup_codes"`     // One-time use backup codes
+}
+
+// MFAVerifySetupRequest represents MFA setup verification request
+type MFAVerifySetupRequest struct {
+	Code string `json:"code" binding:"required,len=6,numeric"`
+}
+
+// MFALoginRequest represents login with MFA code
+type MFALoginRequest struct {
+	Email    string `json:"email" binding:"required,email,max=255"`
+	Password string `json:"password" binding:"required,min=12,max=128"`
+	Code     string `json:"code" binding:"required,len=6,numeric"`
+}
+
+// MFABackupCodeRequest represents login with backup code
+type MFABackupCodeRequest struct {
+	Email      string `json:"email" binding:"required,email,max=255"`
+	Password   string `json:"password" binding:"required,min=12,max=128"`
+	BackupCode string `json:"backup_code" binding:"required,len=8,alphanum"`
+}
+
+// MFADisableRequest represents MFA disable request
+type MFADisableRequest struct {
+	Password string `json:"password" binding:"required,min=12,max=128"`
+	Code     string `json:"code" binding:"required,len=6,numeric"`
+}
+
+// MFARegenerateBackupCodesRequest represents backup code regeneration request
+type MFARegenerateBackupCodesRequest struct {
+	Password string `json:"password" binding:"required,min=12,max=128"`
+	Code     string `json:"code" binding:"required,len=6,numeric"`
+}
+
+// MFARegenerateBackupCodesResponse represents new backup codes
+type MFARegenerateBackupCodesResponse struct {
+	BackupCodes []string `json:"backup_codes"`
 }

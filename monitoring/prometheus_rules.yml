@@ -1,0 +1,208 @@
+# Prometheus Alert Rules for LeapMailR
+
+groups:
+  - name: leapmailr_critical
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="leapmailr"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: app
+        annotations:
+          summary: "LeapMailR service is down"
+          description: "Service {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.leapmailr.com/runbooks/service-down"
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          runbook_url: "https://docs.leapmailr.com/runbooks/high-error-rate"
+
+      - alert: DatabaseUnavailable
+        expr: up{job="leapmailr-db"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database is unavailable"
+          description: "Database has been unreachable for 1 minute"
+          runbook_url: "https://docs.leapmailr.com/runbooks/database-down"
+
+      - alert: HighEmailFailureRate
+        expr: |
+          (
+            sum(rate(emails_sent_total{status="failed"}[10m]))
+            /
+            sum(rate(emails_sent_total[10m]))
+          ) > 0.25
+        for: 10m
+        labels:
+          severity: critical
+          component: email
+        annotations:
+          summary: "High email send failure rate"
+          description: "{{ $value | humanizePercentage }} of emails are failing to send"
+          runbook_url: "https://docs.leapmailr.com/runbooks/email-failures"
+
+      - alert: NoEmailsBeingSent
+        expr: rate(emails_sent_total[30m]) == 0
+        for: 30m
+        labels:
+          severity: critical
+          component: email
+        annotations:
+          summary: "No emails being sent"
+          description: "Email sending has stopped for 30 minutes"
+          runbook_url: "https://docs.leapmailr.com/runbooks/email-stopped"
+
+  - name: leapmailr_warning
+    interval: 1m
+    rules:
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            sum by (le, endpoint) (
+              rate(http_request_duration_seconds_bucket[5m])
+            )
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API response time on {{ $labels.endpoint }}"
+          description: "P95 latency is {{ $value | humanizeDuration }} for endpoint {{ $labels.endpoint }}"
+          runbook_url: "https://docs.leapmailr.com/runbooks/slow-api"
+
+      - alert: HighDatabaseConnectionUsage
+        expr: db_connections_in_use / on() group_left() db_connections_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection pool usage"
+          description: "{{ $value | humanizePercentage }} of database connections are in use"
+          runbook_url: "https://docs.leapmailr.com/runbooks/db-connection-exhaustion"
+
+      - alert: DatabaseQuerySlow
+        expr: |
+          histogram_quantile(0.95,
+            sum by (operation, le) (
+              rate(db_query_duration_seconds_bucket[5m])
+            )
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "P95 query time for {{ $labels.operation }} is {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.leapmailr.com/runbooks/slow-queries"
+
+      - alert: ManyAccountLockouts
+        expr: locked_accounts_count > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: auth
+        annotations:
+          summary: "Unusual number of locked accounts"
+          description: "{{ $value }} accounts are currently locked - possible attack"
+          runbook_url: "https://docs.leapmailr.com/runbooks/account-lockouts"
+
+      - alert: HighAuthFailureRate
+        expr: |
+          (
+            sum(rate(auth_failures_total{reason="invalid_credentials"}[5m]))
+            /
+            sum(rate(auth_attempts_total[5m]))
+          ) > 0.3
+        for: 10m
+        labels:
+          severity: warning
+          component: auth
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value | humanizePercentage }} of login attempts are failing"
+          runbook_url: "https://docs.leapmailr.com/runbooks/auth-failures"
+
+      - alert: PotentialDDoS
+        expr: sum(rate(rate_limit_exceeded_total[1m])) > 1000
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Potential DDoS attack detected"
+          description: "Rate limiter blocking {{ $value }} requests/sec"
+          runbook_url: "https://docs.leapmailr.com/runbooks/ddos-response"
+
+      - alert: EmailQueueBacklog
+        expr: email_queue_length > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: email
+        annotations:
+          summary: "Large email queue backlog"
+          description: "{{ $value }} emails waiting in queue"
+          runbook_url: "https://docs.leapmailr.com/runbooks/email-queue-backlog"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes > 2147483648  # 2GB
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanize }}B"
+          runbook_url: "https://docs.leapmailr.com/runbooks/high-memory"
+
+  - name: leapmailr_info
+    interval: 5m
+    rules:
+      - alert: ServiceRestarted
+        expr: app_uptime_seconds < 300
+        labels:
+          severity: info
+          component: app
+        annotations:
+          summary: "Service recently restarted"
+          description: "Service uptime is only {{ $value | humanizeDuration }}"
+
+      - alert: NewDeployment
+        expr: changes(app_info[10m]) > 0
+        labels:
+          severity: info
+          component: deployment
+        annotations:
+          summary: "New deployment detected"
+          description: "App version changed in the last 10 minutes"
+
+      - alert: CertificateExpiringSoon
+        expr: (ssl_certificate_expiry_timestamp - time()) < 604800  # 7 days
+        for: 1h
+        labels:
+          severity: info
+          component: security
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "Certificate expires in {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.leapmailr.com/runbooks/renew-certificate"

@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
-	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -40,45 +40,60 @@ func handleSendGridWebhook(c *gin.Context) {
 		return
 	}
 
-	suppressionService := service.NewSuppressionService()
+	trackingService := service.NewWebhookTrackingService()
+	processedCount := 0
 
 	for _, event := range events {
-		var reason models.SuppressionReason
-		var shouldSuppress bool
-
-		switch event.Event {
-		case "bounce", "dropped":
-			reason = models.SuppressionBounce
-			shouldSuppress = true
-		case "spamreport":
-			reason = models.SuppressionComplaint
-			shouldSuppress = true
-		case "unsubscribe":
-			reason = models.SuppressionUnsubscribe
-			shouldSuppress = true
+		// Parse user ID if provided
+		var userID *uuid.UUID
+		if event.UserID != "" {
+			if uid, err := uuid.Parse(event.UserID); err == nil {
+				userID = &uid
+			}
 		}
 
-		if shouldSuppress && event.Email != "" {
-			metadata := map[string]interface{}{
-				"event":     event.Event,
-				"reason":    event.Reason,
-				"status":    event.Status,
-				"timestamp": event.Timestamp,
-				"provider":  "sendgrid",
-			}
-
-			var userID *uuid.UUID
-			if event.UserID != "" {
-				if uid, err := uuid.Parse(event.UserID); err == nil {
-					userID = &uid
-				}
-			}
-
-			suppressionService.AddSuppressionFromWebhook(event.Email, reason, metadata, userID)
+		// Create metadata
+		metadata := map[string]interface{}{
+			"event":     event.Event,
+			"reason":    event.Reason,
+			"status":    event.Status,
+			"timestamp": event.Timestamp,
+			"provider":  "sendgrid",
 		}
+
+		// Process webhook event to update email status
+		webhookEvent := service.EmailEvent{
+			MessageID: "", // SendGrid may include sg_message_id in custom args
+			Email:     event.Email,
+			Event:     event.Event,
+			Reason:    event.Reason,
+			Timestamp: parseTimestamp(event.Timestamp),
+			Provider:  "sendgrid",
+			Metadata:  metadata,
+			UserID:    userID,
+		}
+
+		if err := trackingService.ProcessWebhookEvent(webhookEvent); err != nil {
+			// Log error but continue processing other events
+			continue
+		}
+
+		processedCount++
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "processed"})
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "processed",
+		"processed": processedCount,
+		"total":     len(events),
+	})
+}
+
+// parseTimestamp converts Unix timestamp to time.Time
+func parseTimestamp(timestamp int64) time.Time {
+	if timestamp == 0 {
+		return time.Now()
+	}
+	return time.Unix(timestamp, 0)
 }
 
 // Mailgun webhook payload structure
@@ -92,6 +107,8 @@ type MailgunEventData struct {
 	Reason    string                 `json:"reason"`
 	Severity  string                 `json:"severity"`
 	UserVars  map[string]interface{} `json:"user-variables"`
+	MessageID string                 `json:"message-id"` // Mailgun message ID
+	Timestamp float64                `json:"timestamp"`  // Unix timestamp
 }
 
 func handleMailgunWebhook(c *gin.Context) {
@@ -102,41 +119,43 @@ func handleMailgunWebhook(c *gin.Context) {
 	}
 
 	event := payload.EventData
-	suppressionService := service.NewSuppressionService()
+	trackingService := service.NewWebhookTrackingService()
 
-	var reason models.SuppressionReason
-	var shouldSuppress bool
-
-	switch event.Event {
-	case "failed", "bounced":
-		if event.Severity == "permanent" {
-			reason = models.SuppressionBounce
-			shouldSuppress = true
+	// Parse user ID if provided
+	var userID *uuid.UUID
+	if userVarID, ok := event.UserVars["user_id"].(string); ok {
+		if uid, err := uuid.Parse(userVarID); err == nil {
+			userID = &uid
 		}
-	case "complained":
-		reason = models.SuppressionComplaint
-		shouldSuppress = true
-	case "unsubscribed":
-		reason = models.SuppressionUnsubscribe
-		shouldSuppress = true
 	}
 
-	if shouldSuppress && event.Recipient != "" {
-		metadata := map[string]interface{}{
-			"event":    event.Event,
-			"reason":   event.Reason,
-			"severity": event.Severity,
-			"provider": "mailgun",
-		}
+	// Create metadata
+	metadata := map[string]interface{}{
+		"event":    event.Event,
+		"reason":   event.Reason,
+		"severity": event.Severity,
+		"provider": "mailgun",
+	}
 
-		var userID *uuid.UUID
-		if userVarID, ok := event.UserVars["user_id"].(string); ok {
-			if uid, err := uuid.Parse(userVarID); err == nil {
-				userID = &uid
-			}
-		}
+	// Process webhook event to update email status
+	webhookEvent := service.EmailEvent{
+		MessageID: event.MessageID,
+		Email:     event.Recipient,
+		Event:     event.Event,
+		Reason:    event.Reason,
+		Timestamp: time.Unix(int64(event.Timestamp), 0),
+		Provider:  "mailgun",
+		Metadata:  metadata,
+		UserID:    userID,
+	}
 
-		suppressionService.AddSuppressionFromWebhook(event.Recipient, reason, metadata, userID)
+	if err := trackingService.ProcessWebhookEvent(webhookEvent); err != nil {
+		// Log error but return success to provider
+		c.JSON(http.StatusOK, gin.H{
+			"status": "processed",
+			"error":  err.Error(),
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "processed"})
@@ -145,11 +164,13 @@ func handleMailgunWebhook(c *gin.Context) {
 // Generic webhook handler for custom integrations
 func GenericWebhookHandler(c *gin.Context) {
 	var payload struct {
-		Email    string                 `json:"email" binding:"required"`
-		Event    string                 `json:"event" binding:"required"`
-		Reason   string                 `json:"reason"`
-		UserID   string                 `json:"user_id"`
-		Metadata map[string]interface{} `json:"metadata"`
+		MessageID string                 `json:"message_id"`
+		Email     string                 `json:"email" binding:"required"`
+		Event     string                 `json:"event" binding:"required"`
+		Reason    string                 `json:"reason"`
+		UserID    string                 `json:"user_id"`
+		Timestamp int64                  `json:"timestamp"`
+		Metadata  map[string]interface{} `json:"metadata"`
 	}
 
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -157,28 +178,9 @@ func GenericWebhookHandler(c *gin.Context) {
 		return
 	}
 
-	var reason models.SuppressionReason
-	var shouldSuppress bool
+	trackingService := service.NewWebhookTrackingService()
 
-	switch payload.Event {
-	case "bounce":
-		reason = models.SuppressionBounce
-		shouldSuppress = true
-	case "complaint", "spam":
-		reason = models.SuppressionComplaint
-		shouldSuppress = true
-	case "unsubscribe":
-		reason = models.SuppressionUnsubscribe
-		shouldSuppress = true
-	}
-
-	if !shouldSuppress {
-		c.JSON(http.StatusOK, gin.H{"status": "ignored"})
-		return
-	}
-
-	suppressionService := service.NewSuppressionService()
-
+	// Parse user ID
 	var userID *uuid.UUID
 	if payload.UserID != "" {
 		if uid, err := uuid.Parse(payload.UserID); err == nil {
@@ -186,14 +188,27 @@ func GenericWebhookHandler(c *gin.Context) {
 		}
 	}
 
+	// Prepare metadata
 	if payload.Metadata == nil {
 		payload.Metadata = make(map[string]interface{})
 	}
 	payload.Metadata["event"] = payload.Event
 	payload.Metadata["reason"] = payload.Reason
+	payload.Metadata["provider"] = "generic"
 
-	err := suppressionService.AddSuppressionFromWebhook(payload.Email, reason, payload.Metadata, userID)
-	if err != nil {
+	// Process webhook event to update email status
+	webhookEvent := service.EmailEvent{
+		MessageID: payload.MessageID,
+		Email:     payload.Email,
+		Event:     payload.Event,
+		Reason:    payload.Reason,
+		Timestamp: parseTimestamp(payload.Timestamp),
+		Provider:  "generic",
+		Metadata:  payload.Metadata,
+		UserID:    userID,
+	}
+
+	if err := trackingService.ProcessWebhookEvent(webhookEvent); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

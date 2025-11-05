@@ -1,0 +1,51 @@
+# Prometheus Configuration for LeapMailR
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'production'
+    env: 'prod'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules
+rule_files:
+  - "prometheus_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # LeapMailR application
+  - job_name: 'leapmailr'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'leapmailr:8080'
+    metric_relabel_configs:
+      # Drop high-cardinality labels if needed
+      - source_labels: [__name__]
+        regex: 'go_.*'
+        action: drop
+
+  # PostgreSQL database (if using postgres_exporter)
+  - job_name: 'leapmailr-db'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+
+  # Node exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'

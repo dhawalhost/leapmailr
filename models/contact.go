@@ -56,29 +56,29 @@ func (cl *ContactList) BeforeCreate(tx *gorm.DB) error {
 
 // CreateContactRequest represents a request to create a contact
 type CreateContactRequest struct {
-	Email    string            `json:"email" binding:"required,email"`
-	Name     string            `json:"name,omitempty"`
-	Phone    string            `json:"phone,omitempty"`
-	Company  string            `json:"company,omitempty"`
-	Source   string            `json:"source,omitempty"`
+	Email    string            `json:"email" binding:"required,email,max=255"`
+	Name     string            `json:"name,omitempty" binding:"omitempty,max=255"`
+	Phone    string            `json:"phone,omitempty" binding:"omitempty,max=50,numeric"`
+	Company  string            `json:"company,omitempty" binding:"omitempty,max=255"`
+	Source   string            `json:"source,omitempty" binding:"omitempty,max=100,alphanumunicode"`
 	Metadata map[string]string `json:"metadata,omitempty"`
-	Tags     []string          `json:"tags,omitempty"`
+	Tags     []string          `json:"tags,omitempty" binding:"omitempty,max=20,dive,max=50,alphanumunicode"`
 }
 
 // UpdateContactRequest represents a request to update a contact
 type UpdateContactRequest struct {
-	Name         string            `json:"name,omitempty"`
-	Phone        string            `json:"phone,omitempty"`
-	Company      string            `json:"company,omitempty"`
+	Name         string            `json:"name,omitempty" binding:"omitempty,max=255"`
+	Phone        string            `json:"phone,omitempty" binding:"omitempty,max=50,numeric"`
+	Company      string            `json:"company,omitempty" binding:"omitempty,max=255"`
 	Metadata     map[string]string `json:"metadata,omitempty"`
-	Tags         []string          `json:"tags,omitempty"`
+	Tags         []string          `json:"tags,omitempty" binding:"omitempty,max=20,dive,max=50,alphanumunicode"`
 	IsSubscribed *bool             `json:"is_subscribed,omitempty"`
 }
 
 // ImportContactsRequest represents a bulk import request
 type ImportContactsRequest struct {
-	Contacts []CreateContactRequest `json:"contacts" binding:"required,min=1"`
-	Source   string                 `json:"source,omitempty"`
+	Contacts []CreateContactRequest `json:"contacts" binding:"required,min=1,max=10000,dive"`
+	Source   string                 `json:"source,omitempty" binding:"omitempty,max=100,alphanumunicode"`
 }
 
 // ContactResponse represents the API response for a contact

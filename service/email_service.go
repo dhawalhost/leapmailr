@@ -7,6 +7,7 @@ import (
 
 	"github.com/dhawalhost/leapmailr/database"
 	"github.com/dhawalhost/leapmailr/models"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -36,6 +37,16 @@ func (s *EmailServiceManager) CreateEmailService(req models.CreateEmailServiceRe
 		return nil, fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 
+	// Encrypt configuration (GAP-SEC-005)
+	encryption, err := utils.NewEncryptionService()
+	if err != nil {
+		return nil, fmt.Errorf("encryption service error: %w", err)
+	}
+	encryptedConfig, err := encryption.Encrypt(string(configJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt configuration: %w", err)
+	}
+
 	// If this is set as default, unset other defaults (within the same project if projectID is provided)
 	if req.IsDefault {
 		query := s.db.Model(&models.EmailService{}).
@@ -59,7 +70,7 @@ func (s *EmailServiceManager) CreateEmailService(req models.CreateEmailServiceRe
 		ProjectID:     req.ProjectID,
 		Name:          req.Name,
 		Provider:      req.Provider,
-		Configuration: string(configJSON),
+		Configuration: encryptedConfig,
 		FromEmail:     req.FromEmail,
 		FromName:      req.FromName,
 		ReplyToEmail:  req.ReplyToEmail,
@@ -165,7 +176,17 @@ func (s *EmailServiceManager) UpdateEmailService(serviceID uuid.UUID, req models
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal configuration: %w", err)
 		}
-		service.Configuration = string(configJSON)
+
+		// Encrypt configuration (GAP-SEC-005)
+		encryption, err := utils.NewEncryptionService()
+		if err != nil {
+			return nil, fmt.Errorf("encryption service error: %w", err)
+		}
+		encryptedConfig, err := encryption.Encrypt(string(configJSON))
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt configuration: %w", err)
+		}
+		service.Configuration = encryptedConfig
 	}
 
 	if req.IsDefault != nil && *req.IsDefault {
@@ -219,9 +240,26 @@ func (s *EmailServiceManager) TestEmailService(serviceID, userID uuid.UUID, req 
 		return nil, fmt.Errorf("failed to get email service: %w", err)
 	}
 
-	// Parse configuration
+	// Decrypt configuration first
+	encryption, err := utils.NewEncryptionService()
+	if err != nil {
+		return &models.TestEmailServiceResponse{
+			Success: false,
+			Error:   "Failed to initialize encryption service",
+		}, nil
+	}
+
+	decryptedConfig, err := encryption.Decrypt(service.Configuration)
+	if err != nil {
+		return &models.TestEmailServiceResponse{
+			Success: false,
+			Error:   "Failed to decrypt service configuration",
+		}, nil
+	}
+
+	// Parse decrypted configuration
 	var config map[string]interface{}
-	if err := json.Unmarshal([]byte(service.Configuration), &config); err != nil {
+	if err := json.Unmarshal([]byte(decryptedConfig), &config); err != nil {
 		return &models.TestEmailServiceResponse{
 			Success: false,
 			Error:   "Failed to parse service configuration",
@@ -442,10 +480,22 @@ func (s *EmailServiceManager) toResponse(service *models.EmailService) *models.E
 	response.ProviderLogo = metadata.Logo
 	response.ProviderColor = metadata.Color
 
-	// Add safe config preview
-	var config map[string]interface{}
-	if err := json.Unmarshal([]byte(service.Configuration), &config); err == nil {
-		response.ConfigPreview = s.createConfigPreview(service.Provider, config)
+	// Decrypt and add safe config preview (GAP-SEC-005)
+	encryption, err := utils.NewEncryptionService()
+	if err == nil {
+		decryptedConfig, err := encryption.Decrypt(service.Configuration)
+		if err == nil {
+			var config map[string]interface{}
+			if err := json.Unmarshal([]byte(decryptedConfig), &config); err == nil {
+				response.ConfigPreview = s.createConfigPreview(service.Provider, config)
+			}
+		} else {
+			// If decryption fails, try to parse as unencrypted (for backward compatibility)
+			var config map[string]interface{}
+			if err := json.Unmarshal([]byte(service.Configuration), &config); err == nil {
+				response.ConfigPreview = s.createConfigPreview(service.Provider, config)
+			}
+		}
 	}
 
 	return response

@@ -31,14 +31,16 @@ func InitDatabase() error {
 
 	// Set log level based on environment
 	logLevel := logger.Silent
-	if conf.EnvMode != "release" {
-		logLevel = logger.Info
-	}
+	// if conf.EnvMode != "release" {
+	// 	logLevel = logger.Info
+	// }
 
-	fmt.Println(dsn)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logLevel),
 	})
+	// db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	// 	Logger: logger.Default.LogMode(logLevel),
+	// })
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -65,6 +67,8 @@ func runMigrations() error {
 		&models.APIKeyPair{},
 		&models.APIKeyUsageLog{},
 		&models.UserSession{},
+		&models.AuditLog{},
+		&models.PasswordHistory{},
 		&models.Project{},
 		&models.EmailService{},
 		&models.Template{},
@@ -76,6 +80,10 @@ func runMigrations() error {
 		&models.AutoReplyLog{},
 		&models.Contact{},
 		&models.ContactList{},
+		// Email tracking models
+		&models.EmailTracking{},
+		&models.EmailOpenEvent{},
+		&models.EmailClickEvent{},
 	)
 }
 

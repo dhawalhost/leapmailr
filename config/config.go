@@ -30,6 +30,9 @@ type AppConfig struct {
 	JWTExpirationHours int    `mapstructure:"JWT_EXPIRATION_HOURS"`
 	JWTRefreshDays     int    `mapstructure:"JWT_REFRESH_DAYS"`
 
+	// Encryption
+	EncryptionKey string `mapstructure:"ENCRYPTION_KEY"`
+
 	// Rate Limiting
 	RateLimit int `mapstructure:"RATE_LIMIT"`
 
@@ -65,6 +68,9 @@ func LoadConfig() *AppConfig {
 		JWTSecret:          viper.GetString("JWT_SECRET"),
 		JWTExpirationHours: viper.GetInt("JWT_EXPIRATION_HOURS"),
 		JWTRefreshDays:     viper.GetInt("JWT_REFRESH_DAYS"),
+
+		// Encryption
+		EncryptionKey: viper.GetString("ENCRYPTION_KEY"),
 
 		// Rate Limiting & Services
 		RateLimit: viper.GetInt("RATE_LIMIT"),

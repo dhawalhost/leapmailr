@@ -13,6 +13,7 @@ import (
 
 	"github.com/dhawalhost/leapmailr/database"
 	"github.com/dhawalhost/leapmailr/models"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -74,22 +75,46 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 		return nil, fmt.Errorf("failed to process template: %w", err)
 	}
 
-	// Create email log entry
+	// Extract domain from service's from email for Message-ID
+	fromEmail := getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService)
+	domain := "leapmailr.local"
+	if parts := strings.Split(fromEmail, "@"); len(parts) == 2 {
+		domain = parts[1]
+	}
+
+	// Create email log entry with unique MessageID
 	emailLog := models.EmailLog{
 		UserID:     &userID,
 		TemplateID: &emailTemplate.ID,
 		ServiceID:  &emailService.ID,
-		FromEmail:  getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService),
+		FromEmail:  fromEmail,
 		FromName:   getFromNameWithTemplate(req.FromName, emailTemplate, emailService),
 		ToEmail:    req.ToEmail,
 		ToName:     req.ToName,
 		Subject:    subject,
 		Status:     "queued",
+		MessageID:  generateMessageID(domain),
 		Metadata:   "{}",
 	}
 
 	if err := s.db.Create(&emailLog).Error; err != nil {
 		return nil, fmt.Errorf("failed to create email log: %w", err)
+	}
+
+	// Create tracking record and inject tracking elements (if enabled and HTML content exists)
+	if req.EnableTracking && htmlContent != "" {
+		trackingService := NewEmailTrackingService()
+		tracking, err := trackingService.CreateTracking(emailLog.ID)
+		if err == nil && tracking != nil {
+			// Get base URL from environment or configuration
+			baseURL := utils.GetBaseURL() // You'll need to implement this
+
+			// Inject tracking pixel
+			htmlContent = trackingService.InjectTrackingPixel(htmlContent, tracking.TrackingPixelID, baseURL)
+
+			// Inject link tracking
+			htmlContent = trackingService.InjectLinkTracking(htmlContent, tracking.TrackingPixelID, baseURL)
+		}
 	}
 
 	// Send email immediately or schedule
@@ -130,6 +155,15 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 	}
 
 	return &emailLog, nil
+}
+
+// generateMessageID generates a unique Message-ID for email tracking
+// Format: <uuid@domain> which is RFC-compliant
+func generateMessageID(domain string) string {
+	if domain == "" {
+		domain = "leapmailr.local"
+	}
+	return fmt.Sprintf("%s@%s", uuid.New().String(), domain)
 }
 
 // SendBulkEmail sends bulk emails
@@ -186,17 +220,25 @@ func (s *EmailService) SendBulkEmail(req models.BulkEmailRequest, userID uuid.UU
 			continue // Skip this recipient on template error
 		}
 
-		// Create email log entry
+		// Extract domain from service's from email for Message-ID
+		fromEmail := getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService)
+		domain := "leapmailr.local"
+		if parts := strings.Split(fromEmail, "@"); len(parts) == 2 {
+			domain = parts[1]
+		}
+
+		// Create email log entry with unique MessageID
 		emailLog := models.EmailLog{
 			UserID:     &userID,
 			TemplateID: &emailTemplate.ID,
 			ServiceID:  &emailService.ID,
-			FromEmail:  getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService),
+			FromEmail:  fromEmail,
 			FromName:   getFromNameWithTemplate(req.FromName, emailTemplate, emailService),
 			ToEmail:    recipient.Email,
 			ToName:     recipient.Name,
 			Subject:    subject,
 			Status:     "queued",
+			MessageID:  generateMessageID(domain),
 			Metadata:   "{}",
 		}
 
@@ -215,7 +257,18 @@ func (s *EmailService) SendBulkEmail(req models.BulkEmailRequest, userID uuid.UU
 		}
 
 		// Send email (in production, this should be queued)
-		go func(log models.EmailLog, html, text string) {
+		go func(log models.EmailLog, html, text string, enableTracking bool) {
+			// Create tracking if enabled
+			if enableTracking && html != "" {
+				trackingService := NewEmailTrackingService()
+				tracking, err := trackingService.CreateTracking(log.ID)
+				if err == nil && tracking != nil {
+					baseURL := utils.GetBaseURL()
+					html = trackingService.InjectTrackingPixel(html, tracking.TrackingPixelID, baseURL)
+					html = trackingService.InjectLinkTracking(html, tracking.TrackingPixelID, baseURL)
+				}
+			}
+
 			err := s.sendEmailViaSMTP(emailService, emailTemplate, log, html, text, nil)
 			if err != nil {
 				log.Status = "failed"
@@ -226,7 +279,7 @@ func (s *EmailService) SendBulkEmail(req models.BulkEmailRequest, userID uuid.UU
 				log.SentAt = &now
 			}
 			s.db.Save(&log)
-		}(emailLog, htmlContent, textContent)
+		}(emailLog, htmlContent, textContent, req.EnableTracking)
 	}
 
 	return emailLogs, nil
@@ -400,16 +453,23 @@ func (s *EmailService) sendAutoReply(service models.EmailService, autoReplyTempl
 	}
 
 	// Create email log for auto-reply
+	fromEmail := getFromEmailWithTemplate("", autoReplyTemplate, service)
+	domain := "leapmailr.local"
+	if parts := strings.Split(fromEmail, "@"); len(parts) == 2 {
+		domain = parts[1]
+	}
+
 	emailLog := models.EmailLog{
 		UserID:     &userID,
 		TemplateID: &autoReplyTemplate.ID,
 		ServiceID:  &service.ID,
-		FromEmail:  getFromEmailWithTemplate("", autoReplyTemplate, service),
+		FromEmail:  fromEmail,
 		FromName:   getFromNameWithTemplate("", autoReplyTemplate, service),
 		ToEmail:    toEmail,
 		ToName:     toName,
 		Subject:    autoReplyTemplate.Subject,
 		Status:     "queued",
+		MessageID:  generateMessageID(domain),
 		Metadata:   `{"auto_reply": true}`,
 	}
 
@@ -529,9 +589,22 @@ func parseSMTPConfig(config string) struct {
 	UseTLS    bool
 	UseSSL    bool
 } {
+	// Decrypt configuration (GAP-SEC-005)
+	encryption, err := utils.NewEncryptionService()
+	var decryptedConfig string
+	if err == nil {
+		decryptedConfig, err = encryption.Decrypt(config)
+		if err != nil {
+			// If decryption fails, try to parse as unencrypted (for backward compatibility)
+			decryptedConfig = config
+		}
+	} else {
+		decryptedConfig = config
+	}
+
 	// Parse JSON configuration
 	var configMap map[string]interface{}
-	if err := json.Unmarshal([]byte(config), &configMap); err != nil {
+	if err := json.Unmarshal([]byte(decryptedConfig), &configMap); err != nil {
 		// Return default if parsing fails
 		return struct {
 			Host      string
@@ -613,6 +686,11 @@ func composeMessage(template models.Template, service models.EmailService, log m
 	// Headers
 	message.WriteString(fmt.Sprintf("From: %s <%s>\r\n", log.FromName, log.FromEmail))
 	message.WriteString(fmt.Sprintf("To: %s <%s>\r\n", log.ToName, log.ToEmail))
+
+	// Add unique Message-ID header for tracking
+	if log.MessageID != "" {
+		message.WriteString(fmt.Sprintf("Message-ID: <%s>\r\n", log.MessageID))
+	}
 
 	// Add Reply-To header if configured (template override > service default)
 	replyTo := getReplyToEmail(template, service)

@@ -1,12 +1,51 @@
-# LeapMailr - Professional Email Service Platform
+# LeapMailR - Professional Email Service Platform
 
-![LeapMailr](static/leapmailr.png)
+![LeapMailR](static/leapmailr.png)
+
+**Enterprise-grade email platform with SOC 2 compliance, built with Go and Next.js**
+
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+---
+
+## 🚀 Quick Start
+
+**Get up and running in 2 minutes:**
+
+```bash
+# Clone and setup
+git clone https://github.com/dhawalhost/leapmailr.git
+cd leapmailr
+chmod +x setup.sh && ./setup.sh
+
+# Start the application
+./start.sh
+```
+
+**Or using Make:**
+```bash
+make setup
+make run
+```
+
+**Or using Docker:**
+```bash
+cd docker-compose
+docker-compose up -d
+```
+
+📖 **[Read the Complete Setup Guide →](docs/SETUP_GUIDE.md)**  
+⚡ **[Quick Reference →](QUICKSTART.md)**
+
+---
 
 ## Overview
 
-LeapMailr is a powerful email service platform that enables developers and businesses to send transactional emails with ease. Built with Go and featuring a modern web dashboard, LeapMailr provides a complete solution for managing email delivery, templates, and analytics.
+LeapMailR is a powerful, production-ready email service platform that enables developers and businesses to send transactional emails with ease. Built with Go for the backend and Next.js for the frontend, LeapMailR provides enterprise-grade features including multi-factor authentication, secrets management, disaster recovery, and comprehensive monitoring.
 
-## What LeapMailr Does
+### What LeapMailR Does
 
 **Email Delivery Made Simple**
 - Send transactional emails through a REST API or web dashboard
@@ -21,33 +60,59 @@ LeapMailr is a powerful email service platform that enables developers and busin
 - Template testing before deployment
 
 **Analytics & Monitoring**
-- Real-time email delivery tracking
+- Real-time email delivery tracking with Prometheus metrics
 - Detailed analytics on open rates, click rates, and delivery status
-- Performance metrics and insights
-- Email history and logs
+- Performance metrics and insights with Grafana dashboards
+- Email history and structured logging (ELK/Loki compatible)
 
 **Developer-Friendly**
 - RESTful API with comprehensive documentation
-- JWT-based authentication
-- API key management
-- Rate limiting and security features
+- JWT-based authentication with MFA support
+- API key management with rotation
+- Rate limiting and advanced security features
 - Webhook notifications for email events
 
 **Modern Dashboard**
-- Beautiful, responsive web interface
+- Beautiful, responsive Next.js web interface
 - Real-time statistics and charts
 - Template editor with code and preview modes
 - User and organization management
 - Role-based access control
 
+**Enterprise Security (SOC 2 Compliant)**
+- Multi-factor authentication (TOTP-based)
+- Secrets management with encryption (AES-256-GCM)
+- Automated secret rotation
+- HTTPS enforcement with security headers
+- CSRF protection and secure cookies
+- Comprehensive audit logging
+- Disaster recovery with automated backups
+
 ## Key Features
 
+### Core Features
 ✨ **Multi-Provider Support** - Integrate with SMTP, SendGrid, Mailgun, or Amazon SES  
-🔒 **Secure Authentication** - JWT tokens with refresh mechanism  
-📊 **Advanced Analytics** - Track delivery rates, opens, and clicks  
+🔒 **Secure Authentication** - JWT tokens with MFA and refresh mechanism  
+📊 **Advanced Analytics** - Track delivery rates, opens, and clicks with Prometheus  
 🎨 **Template System** - Dynamic templates with variable substitution  
 ⚡ **High Performance** - Built with Go for speed and efficiency  
 🔄 **Automatic Failover** - Switch providers automatically if one fails  
+
+### Security & Compliance (SOC 2)
+🔐 **Multi-Factor Authentication** - TOTP with backup codes and QR generation  
+🔑 **Secrets Management** - AES-256-GCM encryption with automated rotation  
+🛡️ **Security Headers** - HSTS, CSP, X-Frame-Options, X-Content-Type-Options  
+🍪 **Secure Cookies** - HttpOnly, Secure, SameSite with CSRF protection  
+🚦 **Rate Limiting** - Multi-tier protection (Global, Auth, API endpoints)  
+✅ **Input Validation** - XSS protection, sanitization, email attachment validation  
+
+### Operations & Monitoring
+📈 **Prometheus Metrics** - Real-time performance and business metrics  
+📊 **Grafana Dashboards** - Pre-built visualizations for monitoring  
+📝 **Structured Logging** - Zap with correlation IDs and dual output  
+💾 **Disaster Recovery** - Automated backups with 2-hour RTO target  
+🔄 **Secret Rotation** - Automated rotation with configurable policies  
+🚨 **AlertManager** - Proactive alerting for security and operational events  
 📧 **Bulk Sending** - Send thousands of personalized emails  
 🎯 **Rate Limiting** - Protect your infrastructure  
 📱 **Responsive Dashboard** - Works on desktop and mobile  
