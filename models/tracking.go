@@ -56,6 +56,19 @@ type EmailClickEvent struct {
 	Tracking EmailTracking `json:"tracking,omitempty" gorm:"foreignKey:TrackingID"`
 }
 
+// TrackedLink stores pre-approved URLs for secure redirect tracking
+// This prevents open redirect vulnerabilities by storing URLs at email send time
+type TrackedLink struct {
+	ID              uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	TrackingPixelID string    `json:"tracking_pixel_id" gorm:"type:varchar(255);not null;index"`
+	LinkID          string    `json:"link_id" gorm:"type:varchar(255);not null;index"`
+	OriginalURL     string    `json:"original_url" gorm:"type:text;not null"`
+	CreatedAt       time.Time `json:"created_at"`
+
+	// Composite index for fast lookups
+	// Index on (tracking_pixel_id, link_id) for O(1) URL lookup
+}
+
 // EmailTrackingAnalytics represents aggregated analytics for an email
 type EmailTrackingAnalytics struct {
 	EmailLogID      uuid.UUID      `json:"email_log_id"`

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"net/http"
 
 	"github.com/dhawalhost/leapmailr/service"
@@ -39,10 +38,10 @@ func TrackOpenHandler(c *gin.Context) {
 }
 
 // TrackClickHandler handles link click tracking and redirect
+// SECURITY: No longer accepts URLs from user input - retrieves from database
 func TrackClickHandler(c *gin.Context) {
 	trackingPixelID := c.Param("pixel_id")
 	linkID := c.Param("link_id")
-	encodedURL := c.Query("url")
 
 	// Validate tracking IDs
 	if err := utils.ValidateTrackingID(trackingPixelID); err != nil {
@@ -54,20 +53,23 @@ func TrackClickHandler(c *gin.Context) {
 		return
 	}
 
-	// Decode the original URL
-	urlBytes, err := base64.URLEncoding.DecodeString(encodedURL)
+	// SECURITY: Retrieve pre-approved URL from database (stored at send time)
+	// This prevents open redirect attacks - URL is NOT from user input
+	trackingService := service.NewEmailTrackingService()
+	originalURL, err := trackingService.GetTrackedLinkURL(trackingPixelID, linkID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tracking URL"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Tracked link not found",
+		})
 		return
 	}
 
-	originalURL := string(urlBytes)
-
-	// Validate the URL before redirecting (SECURITY: Prevent open redirect attacks)
+	// Additional validation as defense-in-depth
+	// (URLs should already be validated at send time, but validate again)
 	if err := utils.ValidateRedirectURL(originalURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "Invalid redirect URL",
-			"details": err.Error(),
+			"details": "The stored URL failed validation",
 		})
 		return
 	}
@@ -82,7 +84,7 @@ func TrackClickHandler(c *gin.Context) {
 		trackingService.RecordClick(trackingPixelID, linkID, originalURL, ipAddress, userAgent)
 	}()
 
-	// Redirect to validated URL
+	// Redirect to pre-approved URL from database (NOT from user input)
 	c.Redirect(http.StatusFound, originalURL)
 }
 

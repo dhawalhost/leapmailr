@@ -66,6 +66,7 @@ func (s *EmailTrackingService) InjectTrackingPixel(htmlContent string, trackingP
 }
 
 // InjectLinkTracking replaces all links in HTML with tracked links
+// SECURITY: Stores all tracked URLs in database to prevent open redirect vulnerabilities
 func (s *EmailTrackingService) InjectLinkTracking(htmlContent string, trackingPixelID string, baseURL string) string {
 	// Regular expression to match href attributes
 	linkRegex := regexp.MustCompile(`href=["']([^"']+)["']`)
@@ -89,12 +90,20 @@ func (s *EmailTrackingService) InjectLinkTracking(htmlContent string, trackingPi
 		// Generate link ID
 		linkID := generateLinkID(originalURL)
 
-		// Create tracking URL
-		trackingURL := fmt.Sprintf("%s/api/v1/track/click/%s/%s?url=%s",
+		// Store the tracked link in database (SECURITY: Pre-approved URLs only)
+		trackedLink := models.TrackedLink{
+			TrackingPixelID: trackingPixelID,
+			LinkID:          linkID,
+			OriginalURL:     originalURL,
+		}
+		s.db.Create(&trackedLink)
+
+		// Create tracking URL WITHOUT the original URL parameter
+		// URL will be retrieved from database using tracking IDs
+		trackingURL := fmt.Sprintf("%s/api/v1/track/click/%s/%s",
 			baseURL,
 			trackingPixelID,
-			linkID,
-			base64.URLEncoding.EncodeToString([]byte(originalURL)))
+			linkID)
 
 		return fmt.Sprintf(`href="%s"`, trackingURL)
 	})
@@ -216,6 +225,20 @@ func (s *EmailTrackingService) RecordClick(trackingPixelID string, linkID string
 	}
 
 	return nil
+}
+
+// GetTrackedLinkURL retrieves the original URL for a tracked link from database
+// SECURITY: This method ensures URLs are pre-approved (stored at send time), not user-controlled
+func (s *EmailTrackingService) GetTrackedLinkURL(trackingPixelID string, linkID string) (string, error) {
+	var trackedLink models.TrackedLink
+	err := s.db.Where("tracking_pixel_id = ? AND link_id = ?", trackingPixelID, linkID).
+		First(&trackedLink).Error
+
+	if err != nil {
+		return "", fmt.Errorf("tracked link not found: %w", err)
+	}
+
+	return trackedLink.OriginalURL, nil
 }
 
 // GetAnalytics retrieves analytics for a specific email
