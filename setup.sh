@@ -35,6 +35,7 @@ print_error() {
     local message="$1"
     echo -e "${RED}✗ $message${NC}"
     exit 1
+    return 1
 }
 
 # Check if command exists
@@ -297,7 +298,7 @@ echo ""
 # ==========================================
 # 8. Setup Frontend (if Node.js available)
 # ==========================================
-if command_exists node && [ -d "../leapmailr-ui" ]]; then
+if command_exists node && [[ -d "../leapmailr-ui" ]]; then
     echo "Step 8: Setting up frontend..."
     
     cd ../leapmailr-ui
@@ -356,7 +357,7 @@ echo "   or"
 echo "   $ go run ."
 echo ""
 
-if command_exists node && [ -d "../leapmailr-ui" ]]; then
+if command_exists node && [[ -d "../leapmailr-ui" ]]; then
     echo "2. Start the frontend (in a new terminal):"
     echo "   $ cd ../leapmailr-ui"
     echo "   $ npm run dev"
@@ -366,9 +367,9 @@ fi
 echo "3. Access the application:"
 echo "   Backend API: http://localhost:8080"
 echo "   Health Check: http://localhost:8080/health"
-echo "   Metrics: http://localhost:8080/metrics"
+   Metrics: http://localhost:8080/metrics"
 
-if command_exists node && [ -d "../leapmailr-ui" ]]; then
+if command_exists node && [[ -d "../leapmailr-ui" ]]; then
     echo "   Frontend: http://localhost:3000"
 fi
 
@@ -377,7 +378,7 @@ echo "4. Default credentials will be created on first run."
 echo ""
 echo "For more information, see docs/SETUP_GUIDE.md"
 echo ""
-echo "=========================================="
+echo "$SEPARATOR_LINE"
 
 # Create a start script
 cat > start.sh << 'EOF'

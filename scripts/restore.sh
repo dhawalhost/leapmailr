@@ -29,6 +29,7 @@ error_exit() {
     local message="$1"
     log "ERROR: $message"
     exit 1
+    return 1
 }
 
 # Check arguments
@@ -92,7 +93,7 @@ else
 fi
 
 # Cleanup temp file
-if [[ -n "$TEMP_FILE" ]] && [ -f "$TEMP_FILE" ]]; then
+if [[ -n "$TEMP_FILE" ]] && [[ -f "$TEMP_FILE" ]]; then
     rm -f "$TEMP_FILE"
 fi
 

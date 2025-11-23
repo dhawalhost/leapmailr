@@ -599,67 +599,41 @@ func (s *EmailServiceManager) createConfigPreview(provider string, config map[st
 	return preview
 }
 
+// validateRequiredFields checks if all required fields are present in the configuration
+func validateRequiredFields(config map[string]interface{}, required []string) error {
+	for _, field := range required {
+		if _, ok := config[field]; !ok {
+			return fmt.Errorf("missing required field: %s", field)
+		}
+	}
+	return nil
+}
+
 func (s *EmailServiceManager) validateConfiguration(provider string, config map[string]interface{}) error {
 	switch provider {
 	case "smtp":
 		// from_email is now a separate field on EmailService, not in configuration
-		required := []string{"host", "port", "username", "password"}
-		for _, field := range required {
-			if _, ok := config[field]; !ok {
-				return fmt.Errorf("missing required field: %s", field)
-			}
-		}
+		return validateRequiredFields(config, []string{"host", "port", "username", "password"})
 
-	case "sendgrid":
+	case "sendgrid", "resend":
 		// from_email is now a separate field on EmailService, not in configuration
-		required := []string{"api_key"}
-		for _, field := range required {
-			if _, ok := config[field]; !ok {
-				return fmt.Errorf("missing required field: %s", field)
-			}
-		}
+		return validateRequiredFields(config, []string{"api_key"})
 
 	case "mailgun":
 		// from_email is now a separate field on EmailService, not in configuration
-		required := []string{"domain", "api_key"}
-		for _, field := range required {
-			if _, ok := config[field]; !ok {
-				return fmt.Errorf("missing required field: %s", field)
-			}
-		}
+		return validateRequiredFields(config, []string{"domain", "api_key"})
 
 	case "ses":
 		// from_email is now a separate field on EmailService, not in configuration
-		required := []string{"region", "access_key", "secret_key"}
-		for _, field := range required {
-			if _, ok := config[field]; !ok {
-				return fmt.Errorf("missing required field: %s", field)
-			}
-		}
+		return validateRequiredFields(config, []string{"region", "access_key", "secret_key"})
 
 	case "postmark":
 		// from_email is now a separate field on EmailService, not in configuration
-		required := []string{"server_token"}
-		for _, field := range required {
-			if _, ok := config[field]; !ok {
-				return fmt.Errorf("missing required field: %s", field)
-			}
-		}
-
-	case "resend":
-		// from_email is now a separate field on EmailService, not in configuration
-		required := []string{"api_key"}
-		for _, field := range required {
-			if _, ok := config[field]; !ok {
-				return fmt.Errorf("missing required field: %s", field)
-			}
-		}
+		return validateRequiredFields(config, []string{"server_token"})
 
 	default:
 		return fmt.Errorf("unsupported provider: %s", provider)
 	}
-
-	return nil
 }
 
 func maskString(s string) string {

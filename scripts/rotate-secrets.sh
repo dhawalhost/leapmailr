@@ -31,6 +31,7 @@ error_exit() {
     local message="$1"
     log "ERROR: $message"
     exit 1
+    return 1
 }
 
 log "$SEPARATOR_LINE"

@@ -72,8 +72,8 @@ func GetSMTPProviders() []SMTPProvider {
 			Logo:         "/providers/mailgun.svg",
 			Fields: []SMTPProviderField{
 				FromEmailField(DefaultFromEmail, DefaultFromDescription),
-				UsernameField("SMTP Username", "postmaster@yourdomain.com", "Your Mailgun SMTP username"),
-				PasswordField("SMTP Password", "Your Mailgun SMTP password"),
+				UsernameField(LabelSMTPUsername, "postmaster@yourdomain.com", "Your Mailgun SMTP username"),
+				PasswordField(LabelSMTPPassword, "Your Mailgun SMTP password"),
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func GetSMTPProviders() []SMTPProvider {
 			Logo:         "/providers/sparkpost.svg",
 			Fields: []SMTPProviderField{
 				FromEmailField(DefaultFromEmail, DefaultFromDescription),
-				FixedUsernameField("SMTP Username", "SMTP_Injection", "Use 'SMTP_Injection' as username"),
+				FixedUsernameField(LabelSMTPUsername, "SMTP_Injection", "Use 'SMTP_Injection' as username"),
 				APIKeyPasswordField(LabelAPIKey, "", "Your SparkPost API Key"),
 			},
 		},
@@ -182,7 +182,7 @@ func GetSMTPProviders() []SMTPProvider {
 			Fields: []SMTPProviderField{
 				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				EmailUsernameField("Account Email", "your@email.com", "Your Elastic Email account email"),
-				PasswordField("SMTP Password", "Your Elastic Email SMTP password or API key"),
+				PasswordField(LabelSMTPPassword, "Your Elastic Email SMTP password or API key"),
 			},
 		},
 
