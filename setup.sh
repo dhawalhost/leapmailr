@@ -102,7 +102,7 @@ echo ""
 # ==========================================
 echo "Step 3: Creating configuration file..."
 
-if [ ! -f config.env ]; then
+if [[ ! -f config.env ]]; then
     cat > config.env << EOF
 # ============================================
 # SERVER CONFIGURATION
@@ -287,12 +287,12 @@ echo ""
 # ==========================================
 # 8. Setup Frontend (if Node.js available)
 # ==========================================
-if command_exists node && [ -d "../leapmailr-ui" ]; then
+if command_exists node && [ -d "../leapmailr-ui" ]]; then
     echo "Step 8: Setting up frontend..."
     
     cd ../leapmailr-ui
     
-    if [ ! -f .env.local ]; then
+    if [[ ! -f .env.local ]]; then
         cat > .env.local << EOF
 NEXT_PUBLIC_API_URL=http://localhost:8080
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
@@ -305,7 +305,7 @@ EOF
         print_warning "Frontend .env.local already exists"
     fi
     
-    if [ ! -d "node_modules" ]; then
+    if [[ ! -d "node_modules" ]]; then
         npm install
         print_success "Frontend dependencies installed"
     else
@@ -346,7 +346,7 @@ echo "   or"
 echo "   $ go run ."
 echo ""
 
-if command_exists node && [ -d "../leapmailr-ui" ]; then
+if command_exists node && [ -d "../leapmailr-ui" ]]; then
     echo "2. Start the frontend (in a new terminal):"
     echo "   $ cd ../leapmailr-ui"
     echo "   $ npm run dev"
@@ -358,7 +358,7 @@ echo "   Backend API: http://localhost:8080"
 echo "   Health Check: http://localhost:8080/health"
 echo "   Metrics: http://localhost:8080/metrics"
 
-if command_exists node && [ -d "../leapmailr-ui" ]; then
+if command_exists node && [ -d "../leapmailr-ui" ]]; then
     echo "   Frontend: http://localhost:3000"
 fi
 
@@ -375,7 +375,7 @@ cat > start.sh << 'EOF'
 # Start LeapMailR Backend
 
 # Load environment variables
-if [ -f config.env ]; then
+if [[ -f config.env ]]; then
     export $(cat config.env | grep -v '^#' | xargs)
 fi
 

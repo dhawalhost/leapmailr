@@ -14,6 +14,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// Common error messages
+const (
+	errUserAgent          = "User-Agent"
+	errCSRFTokenGenFailed = "Failed to generate CSRF token"
+)
+
 // RegisterHandler handles user registration
 func RegisterHandler(c *gin.Context) {
 	var req models.RegisterRequest
@@ -53,7 +59,7 @@ func LoginHandler(c *gin.Context) {
 
 	// Extract IP address and user agent for audit logging (GAP-SEC-008)
 	ipAddress := c.ClientIP()
-	userAgent := c.GetHeader("User-Agent")
+	userAgent := c.GetHeader(errUserAgent)
 
 	authService := service.NewAuthService()
 	response, err := authService.Login(req, ipAddress, userAgent)
@@ -80,7 +86,7 @@ func LoginHandler(c *gin.Context) {
 	csrfToken, err := csrfService.GenerateToken(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to generate CSRF token",
+			"error": errCSRFTokenGenFailed,
 		})
 		return
 	}
@@ -115,7 +121,7 @@ func LoginWithMFAHandler(c *gin.Context) {
 
 	// Extract IP address and user agent for audit logging
 	ipAddress := c.ClientIP()
-	userAgent := c.GetHeader("User-Agent")
+	userAgent := c.GetHeader(errUserAgent)
 
 	// Get encryption service
 	encryption, err := utils.NewEncryptionService()
@@ -141,7 +147,7 @@ func LoginWithMFAHandler(c *gin.Context) {
 	csrfToken, err := csrfService.GenerateToken(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to generate CSRF token",
+			"error": errCSRFTokenGenFailed,
 		})
 		return
 	}
@@ -175,7 +181,7 @@ func LoginWithBackupCodeHandler(c *gin.Context) {
 
 	// Extract IP address and user agent for audit logging
 	ipAddress := c.ClientIP()
-	userAgent := c.GetHeader("User-Agent")
+	userAgent := c.GetHeader(errUserAgent)
 
 	// Get encryption service
 	encryption, err := utils.NewEncryptionService()
@@ -201,7 +207,7 @@ func LoginWithBackupCodeHandler(c *gin.Context) {
 	csrfToken, err := csrfService.GenerateToken(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to generate CSRF token",
+			"error": errCSRFTokenGenFailed,
 		})
 		return
 	}
@@ -252,7 +258,7 @@ func RefreshTokenHandler(c *gin.Context) {
 	csrfToken, err := csrfService.GenerateToken(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to generate CSRF token",
+			"error": errCSRFTokenGenFailed,
 		})
 		return
 	}

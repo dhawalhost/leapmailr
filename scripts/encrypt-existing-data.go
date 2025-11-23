@@ -10,6 +10,7 @@ import (
 	"github.com/dhawalhost/leapmailr/database"
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/utils"
+	"gorm.io/gorm"
 )
 
 // Migration script to encrypt existing sensitive data in the database
@@ -28,34 +29,56 @@ func main() {
 	fmt.Println("This script will encrypt existing sensitive data in the database.")
 	fmt.Println()
 
-	// Confirm before proceeding
+	// Confirm backup
+	if !confirmBackup() {
+		os.Exit(1)
+	}
+
+	// Setup encryption service
+	encryption, db := setupEncryption()
+
+	// Encrypt data
+	userStats := encryptUserPrivateKeys(db, encryption)
+	serviceStats := encryptEmailServiceConfigs(db, encryption)
+
+	// Print summary
+	printSummary(userStats, serviceStats)
+
+	// Verify encryption works
+	verifyEncryption(db, encryption)
+
+	printFinalInstructions()
+}
+
+// confirmBackup prompts user to confirm database backup
+func confirmBackup() bool {
 	fmt.Print("Have you created a database backup? (yes/no): ")
 	var confirm string
 	fmt.Scanln(&confirm)
 	if strings.ToLower(confirm) != "yes" {
 		fmt.Println("❌ Please create a backup first using: pg_dump -U postgres leapmailr > backup.sql")
-		os.Exit(1)
+		return false
 	}
+	return true
+}
 
-	// Load configuration
+// setupEncryption initializes configuration, database, and encryption service
+func setupEncryption() (*utils.EncryptionService, *gorm.DB) {
 	fmt.Println("Loading configuration...")
 	cfg := config.LoadConfig()
 
-	// Check if encryption key is set
 	if cfg.EncryptionKey == "" {
 		fmt.Println("❌ ERROR: ENCRYPTION_KEY is not set in .env file")
 		fmt.Println("Generate one with: openssl rand -base64 32")
 		os.Exit(1)
 	}
 
-	// Initialize database
 	fmt.Println("Connecting to database...")
 	if err := database.InitDatabase(); err != nil {
 		log.Fatalf("❌ Failed to connect to database: %v", err)
 	}
 	db := database.GetDB()
 
-	// Initialize encryption service
 	encryption, err := utils.NewEncryptionService()
 	if err != nil {
 		log.Fatalf("❌ Failed to initialize encryption service: %v", err)
@@ -64,98 +87,135 @@ func main() {
 	fmt.Println("✅ Encryption service initialized")
 	fmt.Println()
 
-	// Encrypt User.PrivateKey
+	return encryption, db
+}
+
+// encryptionStats holds encryption operation statistics
+type encryptionStats struct {
+	encrypted int
+	skipped   int
+}
+
+// encryptUserPrivateKeys encrypts all user private keys
+func encryptUserPrivateKeys(db *gorm.DB, encryption *utils.EncryptionService) encryptionStats {
 	fmt.Println("1️⃣  Encrypting User.PrivateKey fields...")
+
 	var users []models.User
 	if err := db.Find(&users).Error; err != nil {
 		log.Fatalf("❌ Failed to fetch users: %v", err)
 	}
 
-	userEncrypted := 0
-	userSkipped := 0
+	stats := encryptionStats{}
 	for _, user := range users {
 		if user.PrivateKey == "" {
-			userSkipped++
+			stats.skipped++
 			continue
 		}
 
-		// Check if already encrypted (base64 strings are typically longer and contain specific chars)
 		if isLikelyEncrypted(user.PrivateKey) {
-			userSkipped++
+			stats.skipped++
 			fmt.Printf("   ⏭️  Skipping user %s (already encrypted)\n", user.Email)
 			continue
 		}
 
-		// Encrypt the private key
-		encryptedKey, err := encryption.Encrypt(user.PrivateKey)
-		if err != nil {
-			fmt.Printf("   ❌ Failed to encrypt private key for user %s: %v\n", user.Email, err)
-			continue
+		if encryptAndUpdateUser(db, encryption, &user) {
+			stats.encrypted++
+			fmt.Printf("   ✅ Encrypted private key for user %s\n", user.Email)
 		}
-
-		// Update in database
-		if err := db.Model(&user).Update("private_key", encryptedKey).Error; err != nil {
-			fmt.Printf("   ❌ Failed to update user %s: %v\n", user.Email, err)
-			continue
-		}
-
-		userEncrypted++
-		fmt.Printf("   ✅ Encrypted private key for user %s\n", user.Email)
 	}
 
-	fmt.Printf("   📊 Users: %d encrypted, %d skipped\n", userEncrypted, userSkipped)
+	fmt.Printf("   📊 Users: %d encrypted, %d skipped\n", stats.encrypted, stats.skipped)
 	fmt.Println()
+	return stats
+}
 
-	// Encrypt EmailService.Configuration
+// encryptAndUpdateUser encrypts a single user's private key
+func encryptAndUpdateUser(db *gorm.DB, encryption *utils.EncryptionService, user *models.User) bool {
+	encryptedKey, err := encryption.Encrypt(user.PrivateKey)
+	if err != nil {
+		fmt.Printf("   ❌ Failed to encrypt private key for user %s: %v\n", user.Email, err)
+		return false
+	}
+
+	if err := db.Model(user).Update("private_key", encryptedKey).Error; err != nil {
+		fmt.Printf("   ❌ Failed to update user %s: %v\n", user.Email, err)
+		return false
+	}
+
+	return true
+}
+
+// encryptEmailServiceConfigs encrypts all email service configurations
+func encryptEmailServiceConfigs(db *gorm.DB, encryption *utils.EncryptionService) encryptionStats {
 	fmt.Println("2️⃣  Encrypting EmailService.Configuration fields...")
+
 	var services []models.EmailService
 	if err := db.Find(&services).Error; err != nil {
 		log.Fatalf("❌ Failed to fetch email services: %v", err)
 	}
 
-	serviceEncrypted := 0
-	serviceSkipped := 0
+	stats := encryptionStats{}
 	for _, service := range services {
 		if service.Configuration == "" {
-			serviceSkipped++
+			stats.skipped++
 			continue
 		}
 
-		// Check if already encrypted
 		if isLikelyEncrypted(service.Configuration) {
-			serviceSkipped++
+			stats.skipped++
 			fmt.Printf("   ⏭️  Skipping service '%s' (already encrypted)\n", service.Name)
 			continue
 		}
 
-		// Encrypt the configuration
-		encryptedConfig, err := encryption.Encrypt(service.Configuration)
-		if err != nil {
-			fmt.Printf("   ❌ Failed to encrypt configuration for service '%s': %v\n", service.Name, err)
-			continue
+		if encryptAndUpdateService(db, encryption, &service) {
+			stats.encrypted++
+			fmt.Printf("   ✅ Encrypted configuration for service '%s' (Provider: %s)\n", service.Name, service.Provider)
 		}
-
-		// Update in database
-		if err := db.Model(&service).Update("configuration", encryptedConfig).Error; err != nil {
-			fmt.Printf("   ❌ Failed to update service '%s': %v\n", service.Name, err)
-			continue
-		}
-
-		serviceEncrypted++
-		fmt.Printf("   ✅ Encrypted configuration for service '%s' (Provider: %s)\n", service.Name, service.Provider)
 	}
 
-	fmt.Printf("   📊 Email Services: %d encrypted, %d skipped\n", serviceEncrypted, serviceSkipped)
+	fmt.Printf("   📊 Email Services: %d encrypted, %d skipped\n", stats.encrypted, stats.skipped)
 	fmt.Println()
+	return stats
+}
 
-	// Summary
+// encryptAndUpdateService encrypts a single email service configuration
+func encryptAndUpdateService(db *gorm.DB, encryption *utils.EncryptionService, service *models.EmailService) bool {
+	encryptedConfig, err := encryption.Encrypt(service.Configuration)
+	if err != nil {
+		fmt.Printf("   ❌ Failed to encrypt configuration for service '%s': %v\n", service.Name, err)
+		return false
+	}
+
+	if err := db.Model(service).Update("configuration", encryptedConfig).Error; err != nil {
+		fmt.Printf("   ❌ Failed to update service '%s': %v\n", service.Name, err)
+		return false
+	}
+
+	return true
+}
+
+// printSummary prints migration summary
+func printSummary(userStats, serviceStats encryptionStats) {
 	fmt.Println("=== Migration Complete ===")
-	fmt.Printf("Total encrypted: %d users + %d email services\n", userEncrypted, serviceEncrypted)
-	fmt.Printf("Total skipped: %d users + %d email services\n", userSkipped, serviceSkipped)
+	fmt.Printf("Total encrypted: %d users + %d email services\n", userStats.encrypted, serviceStats.encrypted)
+	fmt.Printf("Total skipped: %d users + %d email services\n", userStats.skipped, serviceStats.skipped)
 	fmt.Println()
+}
 
-	// Verification
+// verifyEncryption verifies that encryption/decryption works
+func verifyEncryption(db *gorm.DB, encryption *utils.EncryptionService) {
 	fmt.Println("3️⃣  Verifying encryption...")
+
+	verifyUserEncryption(db, encryption)
+	verifyServiceEncryption(db, encryption)
+
+	fmt.Println()
+	fmt.Println("✅ Migration completed successfully!")
+	fmt.Println()
+}
+
+// verifyUserEncryption verifies user private key encryption
+func verifyUserEncryption(db *gorm.DB, encryption *utils.EncryptionService) {
 	var verifyUser models.User
 	if err := db.Where("private_key != ''").First(&verifyUser).Error; err == nil {
 		decrypted, err := encryption.Decrypt(verifyUser.PrivateKey)
@@ -166,7 +226,10 @@ func main() {
 			fmt.Printf("      Encrypted length: %d, Decrypted length: %d\n", len(verifyUser.PrivateKey), len(decrypted))
 		}
 	}
+}
 
+// verifyServiceEncryption verifies email service configuration encryption
+func verifyServiceEncryption(db *gorm.DB, encryption *utils.EncryptionService) {
 	var verifyService models.EmailService
 	if err := db.Where("configuration != ''").First(&verifyService).Error; err == nil {
 		decrypted, err := encryption.Decrypt(verifyService.Configuration)
@@ -177,10 +240,10 @@ func main() {
 			fmt.Printf("      Encrypted length: %d, Decrypted length: %d\n", len(verifyService.Configuration), len(decrypted))
 		}
 	}
+}
 
-	fmt.Println()
-	fmt.Println("✅ Migration completed successfully!")
-	fmt.Println()
+// printFinalInstructions prints important post-migration instructions
+func printFinalInstructions() {
 	fmt.Println("⚠️  IMPORTANT:")
 	fmt.Println("   1. Test your application thoroughly")
 	fmt.Println("   2. Verify users can login and create email services")

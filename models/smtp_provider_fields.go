@@ -5,10 +5,10 @@ package models
 // FromEmailField creates a standard "from_email" field
 func FromEmailField(placeholder, description string) SMTPProviderField {
 	if placeholder == "" {
-		placeholder = "noreply@yourdomain.com"
+		placeholder = DefaultFromEmail
 	}
 	if description == "" {
-		description = "The email address to send from"
+		description = DefaultFromDescription
 	}
 	return SMTPProviderField{
 		Key:         "from_email",

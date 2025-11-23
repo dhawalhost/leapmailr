@@ -26,7 +26,7 @@ error_exit() {
 }
 
 # Check arguments
-if [ $# -lt 1 ]; then
+if [[ $# -lt 1 ]]; then
     echo "Usage: $0 <backup_file>"
     echo "Example: $0 ./backups/leapmailr_backup_20251104_120000.sql.gz"
     exit 1
@@ -35,7 +35,7 @@ fi
 BACKUP_FILE="$1"
 
 # Verify backup file exists
-if [ ! -f "$BACKUP_FILE" ]; then
+if [[ ! -f "$BACKUP_FILE" ]]; then
     error_exit "Backup file not found: $BACKUP_FILE"
 fi
 
@@ -49,14 +49,14 @@ log "=========================================="
 
 # Warning prompt
 read -p "WARNING: This will OVERWRITE the current database. Continue? (yes/no): " -r
-if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]]; then
     log "Restore cancelled by user"
     exit 0
 fi
 
 # Decompress if needed
 TEMP_FILE=""
-if [[ "$BACKUP_FILE" == *.gz ]]; then
+if [[ "$BACKUP_FILE" == *.gz ]]]; then
     log "Decompressing backup file..."
     TEMP_FILE="${BACKUP_FILE%.gz}"
     gunzip -c "$BACKUP_FILE" > "$TEMP_FILE"
@@ -86,7 +86,7 @@ else
 fi
 
 # Cleanup temp file
-if [ -n "$TEMP_FILE" ] && [ -f "$TEMP_FILE" ]; then
+if [[ -n "$TEMP_FILE" ]] && [ -f "$TEMP_FILE" ]]; then
     rm -f "$TEMP_FILE"
 fi
 

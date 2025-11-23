@@ -69,7 +69,32 @@ func DefaultPasswordPolicy() PasswordPolicy {
 
 // ValidatePassword validates a password against the policy
 func ValidatePassword(password string, policy PasswordPolicy) error {
-	if len(password) < policy.MinLength {
+	// Check length
+	if err := validatePasswordLength(password, policy.MinLength); err != nil {
+		return err
+	}
+
+	// Check for common weak passwords
+	if err := checkCommonPasswords(password); err != nil {
+		return err
+	}
+
+	// Check character requirements
+	if err := validatePasswordCharacters(password, policy); err != nil {
+		return err
+	}
+
+	// Check for patterns
+	if err := validatePasswordPatterns(password); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validatePasswordLength checks password length constraints
+func validatePasswordLength(password string, minLength int) error {
+	if len(password) < minLength {
 		return errors.New("password must be at least 12 characters long")
 	}
 
@@ -77,8 +102,13 @@ func ValidatePassword(password string, policy PasswordPolicy) error {
 		return errors.New("password must not exceed 128 characters")
 	}
 
-	// Check for common weak passwords
+	return nil
+}
+
+// checkCommonPasswords checks for common weak passwords
+func checkCommonPasswords(password string) error {
 	lowerPassword := strings.ToLower(password)
+
 	if commonPasswords[lowerPassword] {
 		return errors.New("password is too common and easily guessable")
 	}
@@ -90,25 +120,12 @@ func ValidatePassword(password string, policy PasswordPolicy) error {
 		}
 	}
 
-	var (
-		hasUpper   bool
-		hasLower   bool
-		hasNumber  bool
-		hasSpecial bool
-	)
+	return nil
+}
 
-	for _, char := range password {
-		switch {
-		case unicode.IsUpper(char):
-			hasUpper = true
-		case unicode.IsLower(char):
-			hasLower = true
-		case unicode.IsDigit(char):
-			hasNumber = true
-		case unicode.IsPunct(char) || unicode.IsSymbol(char):
-			hasSpecial = true
-		}
-	}
+// validatePasswordCharacters validates character requirements
+func validatePasswordCharacters(password string, policy PasswordPolicy) error {
+	hasUpper, hasLower, hasNumber, hasSpecial := analyzePasswordCharacters(password)
 
 	if policy.RequireUpper && !hasUpper {
 		return errors.New("password must contain at least one uppercase letter")
@@ -126,12 +143,32 @@ func ValidatePassword(password string, policy PasswordPolicy) error {
 		return errors.New("password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)")
 	}
 
-	// Check for sequential characters (123, abc, etc.)
+	return nil
+}
+
+// analyzePasswordCharacters analyzes character types in password
+func analyzePasswordCharacters(password string) (hasUpper, hasLower, hasNumber, hasSpecial bool) {
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsDigit(char):
+			hasNumber = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+	return
+}
+
+// validatePasswordPatterns checks for invalid patterns
+func validatePasswordPatterns(password string) error {
 	if hasSequentialChars(password) {
 		return errors.New("password must not contain sequential characters (e.g., 123, abc)")
 	}
 
-	// Check for repeated characters (aaa, 111, etc.)
 	if hasRepeatedChars(password, 3) {
 		return errors.New("password must not contain more than 2 repeated characters")
 	}

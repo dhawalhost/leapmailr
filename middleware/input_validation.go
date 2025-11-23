@@ -150,88 +150,153 @@ func XSSProtection() gin.HandlerFunc {
 func ValidateEmailAttachments() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Only validate email sending endpoints
-		path := c.Request.URL.Path
-		if !strings.Contains(path, "/email/send") && !strings.Contains(path, "/email/bulk") {
+		if !isEmailEndpoint(c.Request.URL.Path) {
 			c.Next()
 			return
 		}
 
-		// Read the request body to check attachments
-		body, err := io.ReadAll(c.Request.Body)
+		// Parse request body
+		body, data, err := parseRequestBody(c)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Failed to read request body",
-			})
-			c.Abort()
+			abortWithError(c, http.StatusBadRequest, "Failed to read request body")
 			return
 		}
 
-		// Restore the body
-		c.Request.Body.Close()
+		// Restore body for downstream handlers
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 
-		// Parse JSON
-		var data map[string]interface{}
-		if err := json.Unmarshal(body, &data); err != nil {
-			c.Next()
-			return
-		}
-
-		// Check for attachments
-		attachments, ok := data["attachments"].([]interface{})
-		if !ok || len(attachments) == 0 {
-			c.Next()
-			return
-		}
-
-		// Validate each attachment
-		const maxAttachmentSize = 10 * 1024 * 1024 // 10MB
-		totalSize := 0
-
-		for i, att := range attachments {
-			attachment, ok := att.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			// Check content type
-			contentType, _ := attachment["content_type"].(string)
-			if contentType != "" && !utils.ValidateContentType(contentType, utils.AllowedAttachmentTypes) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error":      "Invalid attachment content type",
-					"attachment": i,
-					"type":       contentType,
-				})
-				c.Abort()
-				return
-			}
-
-			// Check size
-			size, _ := attachment["size"].(float64)
-			if size > float64(maxAttachmentSize) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error":      "Attachment exceeds maximum size of 10MB",
-					"attachment": i,
-					"size":       size,
-				})
-				c.Abort()
-				return
-			}
-
-			totalSize += int(size)
-		}
-
-		// Check total size
-		const maxTotalSize = 25 * 1024 * 1024 // 25MB total
-		if totalSize > maxTotalSize {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":      "Total attachment size exceeds maximum of 25MB",
-				"total_size": totalSize,
-			})
-			c.Abort()
-			return
+		// Extract and validate attachments
+		if err := validateAttachments(c, data); err != nil {
+			return // Error already sent
 		}
 
 		c.Next()
 	}
+}
+
+// isEmailEndpoint checks if the path is an email sending endpoint
+func isEmailEndpoint(path string) bool {
+	return strings.Contains(path, "/email/send") || strings.Contains(path, "/email/bulk")
+}
+
+// parseRequestBody reads and parses the JSON request body
+func parseRequestBody(c *gin.Context) ([]byte, map[string]interface{}, error) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	c.Request.Body.Close()
+
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		// Not valid JSON - let handler deal with it
+		return body, nil, nil
+	}
+
+	return body, data, nil
+}
+
+// validateAttachments validates attachment sizes and content types
+func validateAttachments(c *gin.Context, data map[string]interface{}) error {
+	if data == nil {
+		return nil
+	}
+
+	// Extract attachments
+	attachments, ok := data["attachments"].([]interface{})
+	if !ok || len(attachments) == 0 {
+		return nil
+	}
+
+	// Validate each attachment
+	totalSize := 0
+	for i, att := range attachments {
+		attachment, ok := att.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// Validate content type
+		if err := validateAttachmentContentType(c, attachment, i); err != nil {
+			return err
+		}
+
+		// Validate size
+		size, sizeErr := validateAttachmentSize(c, attachment, i)
+		if sizeErr != nil {
+			return sizeErr
+		}
+
+		totalSize += size
+	}
+
+	// Validate total size
+	return validateTotalSize(c, totalSize)
+}
+
+// validateAttachmentContentType validates a single attachment's content type
+func validateAttachmentContentType(c *gin.Context, attachment map[string]interface{}, index int) error {
+	contentType, _ := attachment["content_type"].(string)
+	if contentType != "" && !utils.ValidateContentType(contentType, utils.AllowedAttachmentTypes) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid attachment content type",
+			"attachment": index,
+			"type":       contentType,
+		})
+		c.Abort()
+		return &validationError{message: "invalid content type"}
+	}
+	return nil
+}
+
+// validateAttachmentSize validates a single attachment's size
+func validateAttachmentSize(c *gin.Context, attachment map[string]interface{}, index int) (int, error) {
+	const maxAttachmentSize = 10 * 1024 * 1024 // 10MB
+
+	size, _ := attachment["size"].(float64)
+	if size > float64(maxAttachmentSize) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Attachment exceeds maximum size of 10MB",
+			"attachment": index,
+			"size":       size,
+		})
+		c.Abort()
+		return 0, &validationError{message: "size too large"}
+	}
+
+	return int(size), nil
+}
+
+// validateTotalSize validates the total size of all attachments
+func validateTotalSize(c *gin.Context, totalSize int) error {
+	const maxTotalSize = 25 * 1024 * 1024 // 25MB total
+
+	if totalSize > maxTotalSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Total attachment size exceeds maximum of 25MB",
+			"total_size": totalSize,
+		})
+		c.Abort()
+		return &validationError{message: "total size too large"}
+	}
+
+	return nil
+}
+
+// validationError represents a validation error
+type validationError struct {
+	message string
+}
+
+func (e *validationError) Error() string {
+	return e.message
+}
+
+// abortWithError aborts the request with an error
+func abortWithError(c *gin.Context, statusCode int, message string) {
+	c.JSON(statusCode, gin.H{
+		"error": message,
+	})
+	c.Abort()
 }

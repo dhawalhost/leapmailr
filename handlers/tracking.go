@@ -9,6 +9,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// Tracking error messages
+const (
+	errAuthRequired = "Authentication required"
+)
+
 // TrackOpenHandler handles email open tracking via pixel
 func TrackOpenHandler(c *gin.Context) {
 	trackingPixelID := c.Param("pixel_id")
@@ -92,7 +97,7 @@ func TrackClickHandler(c *gin.Context) {
 func GetEmailAnalyticsHandler(c *gin.Context) {
 	_, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errAuthRequired})
 		return
 	}
 
@@ -123,7 +128,7 @@ func GetEmailAnalyticsHandler(c *gin.Context) {
 func GetCampaignAnalyticsHandler(c *gin.Context) {
 	_, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errAuthRequired})
 		return
 	}
 
@@ -147,7 +152,7 @@ func GetCampaignAnalyticsHandler(c *gin.Context) {
 func GetEmailTrackingEventsHandler(c *gin.Context) {
 	_, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errAuthRequired})
 		return
 	}
 

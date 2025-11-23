@@ -31,7 +31,7 @@ docker build -t leapmailr-backend:local .
 echo -e "${GREEN}✓ Backend image built${NC}"
 
 # Check if .env exists
-if [ ! -f ".env" ]; then
+if [[ ! -f ".env" ]]; then
     echo -e "${YELLOW}⚠️  .env file not found, creating from example...${NC}"
     cat > .env <<EOF
 DB_HOST=postgres
@@ -52,8 +52,8 @@ echo "🔍 Checking PostgreSQL status..."
 POSTGRES_EXISTS=$(docker ps -a --format '{{.Names}}' | grep '^leapmailr-postgres$' || echo "")
 POSTGRES_RUNNING=$(docker ps --format '{{.Names}}' | grep '^leapmailr-postgres$' || echo "")
 
-if [ -n "$POSTGRES_EXISTS" ]; then
-    if [ -n "$POSTGRES_RUNNING" ]; then
+if [[ -n "$POSTGRES_EXISTS" ]]; then
+    if [[ -n "$POSTGRES_RUNNING" ]]; then
         echo -e "${GREEN}✓ PostgreSQL is already running${NC}"
     else
         echo -e "${YELLOW}⚠️  PostgreSQL container exists but is stopped, starting...${NC}"
@@ -70,7 +70,7 @@ fi
 
 # Remove existing backend container if it exists
 BACKEND_EXISTS=$(docker ps -a --format '{{.Names}}' | grep '^leapmailr-backend$' || echo "")
-if [ -n "$BACKEND_EXISTS" ]; then
+if [[ -n "$BACKEND_EXISTS" ]]; then
     echo ""
     echo "🔄 Removing existing backend container..."
     docker rm -f leapmailr-backend

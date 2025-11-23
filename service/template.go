@@ -69,13 +69,43 @@ func (s *TemplateService) GetTemplate(templateID, userID uuid.UUID) (*models.Tem
 
 // UpdateTemplate updates an existing template
 func (s *TemplateService) UpdateTemplate(templateID uuid.UUID, req models.UpdateTemplateRequest, userID uuid.UUID) (*models.Template, error) {
+	// Find template
+	template, err := s.findTemplateForUpdate(templateID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply updates
+	contentChanged := s.applyTemplateUpdates(template, req)
+
+	// Increment version on content changes
+	if contentChanged {
+		template.Version++
+	}
+
+	template.UpdatedAt = time.Now()
+
+	if err := s.db.Save(template).Error; err != nil {
+		return nil, fmt.Errorf("failed to update template: %w", err)
+	}
+
+	return template, nil
+}
+
+// findTemplateForUpdate finds a template for updating
+func (s *TemplateService) findTemplateForUpdate(templateID, userID uuid.UUID) (*models.Template, error) {
 	var template models.Template
 	if err := s.db.Where("id = ? AND (user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?))",
 		templateID, userID, userID).First(&template).Error; err != nil {
 		return nil, fmt.Errorf("template not found: %w", err)
 	}
+	return &template, nil
+}
 
-	// Update fields if provided
+// applyTemplateUpdates applies update request to template and returns whether content changed
+func (s *TemplateService) applyTemplateUpdates(template *models.Template, req models.UpdateTemplateRequest) bool {
+	contentChanged := false
+
 	if req.Name != "" {
 		template.Name = req.Name
 	}
@@ -84,12 +114,15 @@ func (s *TemplateService) UpdateTemplate(templateID uuid.UUID, req models.Update
 	}
 	if req.Subject != "" {
 		template.Subject = req.Subject
+		contentChanged = true
 	}
 	if req.HTMLContent != "" {
 		template.HTMLContent = req.HTMLContent
+		contentChanged = true
 	}
 	if req.TextContent != "" {
 		template.TextContent = req.TextContent
+		contentChanged = true
 	}
 	if req.Variables != "" {
 		template.Variables = req.Variables
@@ -113,18 +146,7 @@ func (s *TemplateService) UpdateTemplate(templateID uuid.UUID, req models.Update
 		template.IsActive = *req.IsActive
 	}
 
-	// Increment version on content changes
-	if req.HTMLContent != "" || req.TextContent != "" || req.Subject != "" {
-		template.Version++
-	}
-
-	template.UpdatedAt = time.Now()
-
-	if err := s.db.Save(&template).Error; err != nil {
-		return nil, fmt.Errorf("failed to update template: %w", err)
-	}
-
-	return &template, nil
+	return contentChanged
 }
 
 // DeleteTemplate deletes a template

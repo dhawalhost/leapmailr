@@ -14,6 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// Email tracking constants
+const (
+	htmlCloseBodyTag = "</body>"
+)
+
 // EmailTrackingService handles email open and click tracking
 type EmailTrackingService struct {
 	db *gorm.DB
@@ -57,8 +62,8 @@ func (s *EmailTrackingService) InjectTrackingPixel(htmlContent string, trackingP
 	trackingPixel := fmt.Sprintf(`<img src="%s" alt="" width="1" height="1" style="display:block;border:0;outline:none;text-decoration:none;" />`, trackingPixelURL)
 
 	// Try to inject before closing body tag
-	if strings.Contains(htmlContent, "</body>") {
-		return strings.Replace(htmlContent, "</body>", trackingPixel+"</body>", 1)
+	if strings.Contains(htmlContent, htmlCloseBodyTag) {
+		return strings.Replace(htmlContent, htmlCloseBodyTag, trackingPixel+htmlCloseBodyTag, 1)
 	}
 
 	// If no body tag, append to end
@@ -68,47 +73,65 @@ func (s *EmailTrackingService) InjectTrackingPixel(htmlContent string, trackingP
 // InjectLinkTracking replaces all links in HTML with tracked links
 // SECURITY: Stores all tracked URLs in database to prevent open redirect vulnerabilities
 func (s *EmailTrackingService) InjectLinkTracking(htmlContent string, trackingPixelID string, baseURL string) string {
-	// Regular expression to match href attributes
 	linkRegex := regexp.MustCompile(`href=["']([^"']+)["']`)
 
 	replacedContent := linkRegex.ReplaceAllStringFunc(htmlContent, func(match string) string {
-		// Extract the URL
-		urlMatch := regexp.MustCompile(`href=["']([^"']+)["']`).FindStringSubmatch(match)
-		if len(urlMatch) < 2 {
-			return match
-		}
-
-		originalURL := urlMatch[1]
-
-		// Skip tracking pixel and anchor links
-		if strings.HasPrefix(originalURL, "#") ||
-			strings.Contains(originalURL, "/track/open/") ||
-			strings.Contains(originalURL, "/track/click/") {
-			return match
-		}
-
-		// Generate link ID
-		linkID := generateLinkID(originalURL)
-
-		// Store the tracked link in database (SECURITY: Pre-approved URLs only)
-		trackedLink := models.TrackedLink{
-			TrackingPixelID: trackingPixelID,
-			LinkID:          linkID,
-			OriginalURL:     originalURL,
-		}
-		s.db.Create(&trackedLink)
-
-		// Create tracking URL WITHOUT the original URL parameter
-		// URL will be retrieved from database using tracking IDs
-		trackingURL := fmt.Sprintf("%s/api/v1/track/click/%s/%s",
-			baseURL,
-			trackingPixelID,
-			linkID)
-
-		return fmt.Sprintf(`href="%s"`, trackingURL)
+		return s.processLinkForTracking(match, trackingPixelID, baseURL)
 	})
 
 	return replacedContent
+}
+
+// processLinkForTracking processes a single link for tracking injection
+func (s *EmailTrackingService) processLinkForTracking(match, trackingPixelID, baseURL string) string {
+	// Extract the URL
+	originalURL := extractURLFromMatch(match)
+	if originalURL == "" {
+		return match
+	}
+
+	// Skip tracking for special links
+	if shouldSkipTracking(originalURL) {
+		return match
+	}
+
+	// Store tracked link and create tracking URL
+	linkID := generateLinkID(originalURL)
+	s.storeTrackedLink(trackingPixelID, linkID, originalURL)
+	trackingURL := buildTrackingURL(baseURL, trackingPixelID, linkID)
+
+	return fmt.Sprintf(`href="%s"`, trackingURL)
+}
+
+// extractURLFromMatch extracts URL from href attribute match
+func extractURLFromMatch(match string) string {
+	urlMatch := regexp.MustCompile(`href=["']([^"']+)["']`).FindStringSubmatch(match)
+	if len(urlMatch) < 2 {
+		return ""
+	}
+	return urlMatch[1]
+}
+
+// shouldSkipTracking determines if a link should skip tracking
+func shouldSkipTracking(url string) bool {
+	return strings.HasPrefix(url, "#") ||
+		strings.Contains(url, "/track/open/") ||
+		strings.Contains(url, "/track/click/")
+}
+
+// storeTrackedLink stores a tracked link in the database
+func (s *EmailTrackingService) storeTrackedLink(trackingPixelID, linkID, originalURL string) {
+	trackedLink := models.TrackedLink{
+		TrackingPixelID: trackingPixelID,
+		LinkID:          linkID,
+		OriginalURL:     originalURL,
+	}
+	s.db.Create(&trackedLink)
+}
+
+// buildTrackingURL creates the tracking URL
+func buildTrackingURL(baseURL, trackingPixelID, linkID string) string {
+	return fmt.Sprintf("%s/api/v1/track/click/%s/%s", baseURL, trackingPixelID, linkID)
 }
 
 // RecordOpen records an email open event

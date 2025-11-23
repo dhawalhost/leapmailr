@@ -4,6 +4,13 @@ import (
 	"testing"
 )
 
+// Test constants
+const (
+	testDomainExample    = "example.com"
+	testDomainAPIExample = "api.example.com"
+	testPathAPIUsers     = "/api/users"
+)
+
 func TestValidateRedirectURL(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -138,28 +145,28 @@ func TestIsAllowedDomain(t *testing.T) {
 		{
 			name:           "Exact domain match",
 			url:            "https://example.com/page",
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomainExample},
 			wantAllowed:    true,
 			wantErr:        false,
 		},
 		{
 			name:           "Subdomain match",
 			url:            "https://sub.example.com/page",
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomainExample},
 			wantAllowed:    true,
 			wantErr:        false,
 		},
 		{
 			name:           "Multiple allowed domains",
 			url:            "https://trusted.com/page",
-			allowedDomains: []string{"example.com", "trusted.com", "safe.org"},
+			allowedDomains: []string{testDomainExample, "trusted.com", "safe.org"},
 			wantAllowed:    true,
 			wantErr:        false,
 		},
 		{
 			name:           "Domain not in allowed list",
 			url:            "https://evil.com/page",
-			allowedDomains: []string{"example.com", "trusted.com"},
+			allowedDomains: []string{testDomainExample, "trusted.com"},
 			wantAllowed:    false,
 			wantErr:        false,
 		},
@@ -173,7 +180,7 @@ func TestIsAllowedDomain(t *testing.T) {
 		{
 			name:           "Relative URL (parsed but not a valid full URL)",
 			url:            "/relative/path",
-			allowedDomains: []string{"example.com"},
+			allowedDomains: []string{testDomainExample},
 			wantAllowed:    false,
 			wantErr:        false,
 		},
@@ -202,8 +209,8 @@ func TestSanitizeHostHeader(t *testing.T) {
 	}{
 		{
 			name:    "Valid domain",
-			host:    "example.com",
-			want:    "example.com",
+			host:    testDomainExample,
+			want:    testDomainExample,
 			wantErr: false,
 		},
 		{
@@ -214,8 +221,8 @@ func TestSanitizeHostHeader(t *testing.T) {
 		},
 		{
 			name:    "Valid subdomain",
-			host:    "api.example.com",
-			want:    "api.example.com",
+			host:    testDomainAPIExample,
+			want:    testDomainAPIExample,
 			wantErr: false,
 		},
 		{
@@ -285,8 +292,8 @@ func TestSanitizeRequestURI(t *testing.T) {
 		},
 		{
 			name:    "Valid path",
-			uri:     "/api/users",
-			want:    "/api/users",
+			uri:     testPathAPIUsers,
+			want:    testPathAPIUsers,
 			wantErr: false,
 		},
 		{
@@ -369,28 +376,28 @@ func TestBuildSecureHTTPSURL(t *testing.T) {
 	}{
 		{
 			name:    "Valid domain and path",
-			host:    "example.com",
-			uri:     "/api/users",
+			host:    testDomainExample,
+			uri:     testPathAPIUsers,
 			want:    "https://example.com/api/users",
 			wantErr: false,
 		},
 		{
 			name:    "Valid domain with port and path",
 			host:    "example.com:8443",
-			uri:     "/api/users",
+			uri:     testPathAPIUsers,
 			want:    "https://example.com:8443/api/users",
 			wantErr: false,
 		},
 		{
 			name:    "Valid subdomain",
-			host:    "api.example.com",
+			host:    testDomainAPIExample,
 			uri:     "/v1/users?limit=10",
 			want:    "https://api.example.com/v1/users?limit=10",
 			wantErr: false,
 		},
 		{
 			name:    "Root path",
-			host:    "example.com",
+			host:    testDomainExample,
 			uri:     "/",
 			want:    "https://example.com/",
 			wantErr: false,
@@ -411,7 +418,7 @@ func TestBuildSecureHTTPSURL(t *testing.T) {
 		},
 		{
 			name:    "Invalid URI - absolute URL",
-			host:    "example.com",
+			host:    testDomainExample,
 			uri:     "http://evil.com/phishing",
 			want:    "",
 			wantErr: true,

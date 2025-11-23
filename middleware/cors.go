@@ -8,49 +8,65 @@ import (
 
 // CorsMiddleware handles CORS settings with strict origin validation (GAP-SEC-011)
 func CorsMiddleware(envMode string) gin.HandlerFunc {
-	// Define allowed origins based on environment
 	allowedOrigins := getAllowedOrigins(envMode)
 
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
+		isAllowed := isOriginInWhitelist(origin, allowedOrigins)
 
-		// Validate origin against whitelist
-		isAllowed := false
-		if origin != "" {
-			for _, allowed := range allowedOrigins {
-				if origin == allowed {
-					isAllowed = true
-					break
-				}
-			}
-		}
-
-		// Set CORS headers only for whitelisted origins
+		// Set CORS headers for allowed origins
 		if isAllowed {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-			c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-API-Key, X-Auth-Token, accept, origin, Cache-Control, X-Requested-With")
-			c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
-			c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+			setCORSHeaders(c, origin)
 		} else if origin != "" {
-			// Log rejected origin for security monitoring
-			c.Writer.Header().Set("Access-Control-Allow-Origin", "")
-			// Optionally log: fmt.Printf("CORS: Rejected origin: %s\n", origin)
+			rejectOrigin(c)
 		}
 
 		// Handle preflight OPTIONS request
 		if c.Request.Method == "OPTIONS" {
-			if isAllowed {
-				c.AbortWithStatus(204)
-			} else {
-				c.AbortWithStatus(403) // Forbidden for non-whitelisted origins
-			}
+			handlePreflightRequest(c, isAllowed)
 			return
 		}
 
-		// Continue to next handler
 		c.Next()
+	}
+}
+
+// isOriginInWhitelist checks if origin is in allowed list
+func isOriginInWhitelist(origin string, allowedOrigins []string) bool {
+	if origin == "" {
+		return false
+	}
+
+	for _, allowed := range allowedOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// setCORSHeaders sets all CORS headers for allowed origins
+func setCORSHeaders(c *gin.Context, origin string) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+	c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-API-Key, X-Auth-Token, accept, origin, Cache-Control, X-Requested-With")
+	c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
+	c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+}
+
+// rejectOrigin handles rejected origins
+func rejectOrigin(c *gin.Context) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "")
+	// Optionally log: fmt.Printf("CORS: Rejected origin: %s\n", c.Request.Header.Get("Origin"))
+}
+
+// handlePreflightRequest handles OPTIONS preflight requests
+func handlePreflightRequest(c *gin.Context, isAllowed bool) {
+	if isAllowed {
+		c.AbortWithStatus(204)
+	} else {
+		c.AbortWithStatus(403) // Forbidden for non-whitelisted origins
 	}
 }
 

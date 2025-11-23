@@ -23,6 +23,7 @@ const (
 	backupCodeLength = 8
 	backupCodeCount  = 10
 	issuer           = "LeapMailR"
+	queryIDEquals    = "id = ?"
 )
 
 var (
@@ -55,7 +56,7 @@ func (s *MFAService) SetupMFA(userID string, password string) (*models.MFASetupR
 
 	// Get user
 	var user models.User
-	if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := db.Where(queryIDEquals, userID).First(&user).Error; err != nil {
 		monitoring.ErrorsTotal.WithLabelValues("user_not_found", "mfa").Inc()
 		return nil, err
 	}
@@ -143,7 +144,7 @@ func (s *MFAService) VerifyMFASetup(userID string, code string) error {
 	db := database.GetDB()
 
 	var user models.User
-	if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := db.Where(queryIDEquals, userID).First(&user).Error; err != nil {
 		monitoring.ErrorsTotal.WithLabelValues("user_not_found", "mfa").Inc()
 		return err
 	}
@@ -194,7 +195,7 @@ func (s *MFAService) VerifyMFACode(userID string, code string) (bool, error) {
 	db := database.GetDB()
 
 	var user models.User
-	if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := db.Where(queryIDEquals, userID).First(&user).Error; err != nil {
 		monitoring.ErrorsTotal.WithLabelValues("user_not_found", "mfa").Inc()
 		return false, err
 	}
@@ -232,7 +233,7 @@ func (s *MFAService) VerifyBackupCode(userID string, backupCode string) (bool, e
 	db := database.GetDB()
 
 	var user models.User
-	if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := db.Where(queryIDEquals, userID).First(&user).Error; err != nil {
 		monitoring.ErrorsTotal.WithLabelValues("user_not_found", "mfa").Inc()
 		return false, err
 	}
@@ -302,7 +303,7 @@ func (s *MFAService) DisableMFA(userID string, password string, code string) err
 	db := database.GetDB()
 
 	var user models.User
-	if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := db.Where(queryIDEquals, userID).First(&user).Error; err != nil {
 		monitoring.ErrorsTotal.WithLabelValues("user_not_found", "mfa").Inc()
 		return err
 	}
@@ -349,7 +350,7 @@ func (s *MFAService) RegenerateBackupCodes(userID string, password string, code 
 	db := database.GetDB()
 
 	var user models.User
-	if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := db.Where(queryIDEquals, userID).First(&user).Error; err != nil {
 		monitoring.ErrorsTotal.WithLabelValues("user_not_found", "mfa").Inc()
 		return nil, err
 	}
@@ -494,7 +495,7 @@ func (s *MFAService) GetMFAStatus(userID string) (bool, int, error) {
 	db := database.GetDB()
 
 	var user models.User
-	if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := db.Where(queryIDEquals, userID).First(&user).Error; err != nil {
 		return false, 0, err
 	}
 

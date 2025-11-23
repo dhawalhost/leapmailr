@@ -18,6 +18,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Email service constants
+const (
+	defaultLocalhost   = "leapmailr.local"
+	defaultNoReplyAddr = "noreply@example.com"
+)
+
 // EmailService handles email operations
 type EmailService struct {
 	db *gorm.DB
@@ -33,38 +39,84 @@ func NewEmailService() *EmailService {
 // SendEmail sends an email using the new API
 func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*models.EmailLog, error) {
 	// Check suppression list first
-	suppressionService := NewSuppressionService()
-	isSuppressed, suppression, err := suppressionService.IsEmailSuppressed(req.ToEmail, userID)
+	if err := s.checkSuppression(req.ToEmail, userID); err != nil {
+		return nil, err
+	}
+
+	// Get template and service
+	emailTemplate, emailService, err := s.getTemplateAndService(req.TemplateID, req.ServiceID, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check suppression list: %w", err)
+		return nil, err
+	}
+
+	// Process template content
+	htmlContent, textContent, subject, err := s.prepareEmailContent(emailTemplate, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create email log entry
+	emailLog, err := s.createEmailLog(emailTemplate, emailService, req, userID, subject, htmlContent, textContent)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle scheduled emails
+	if s.isScheduled(req.ScheduleAt) {
+		return s.scheduleEmail(emailLog)
+	}
+
+	// Send email immediately
+	if err := s.sendImmediately(emailService, emailTemplate, emailLog, htmlContent, textContent, req.Attachments); err != nil {
+		return emailLog, err
+	}
+
+	// Send auto-reply if enabled
+	s.handleAutoReply(emailTemplate, emailService, req, userID)
+
+	return emailLog, nil
+}
+
+// checkSuppression verifies the recipient is not suppressed
+func (s *EmailService) checkSuppression(toEmail string, userID uuid.UUID) error {
+	suppressionService := NewSuppressionService()
+	isSuppressed, suppression, err := suppressionService.IsEmailSuppressed(toEmail, userID)
+	if err != nil {
+		return fmt.Errorf("failed to check suppression list: %w", err)
 	}
 	if isSuppressed {
-		return nil, fmt.Errorf("email address is suppressed (reason: %s)", suppression.Reason)
+		return fmt.Errorf("email address is suppressed (reason: %s)", suppression.Reason)
 	}
+	return nil
+}
 
-	// Get template
+// getTemplateAndService retrieves the template and email service
+func (s *EmailService) getTemplateAndService(templateID uuid.UUID, serviceID *uuid.UUID, userID uuid.UUID) (models.Template, models.EmailService, error) {
 	var emailTemplate models.Template
 	if err := s.db.Where("id = ? AND (user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?))",
-		req.TemplateID, userID, userID).First(&emailTemplate).Error; err != nil {
-		return nil, fmt.Errorf("template not found: %w", err)
+		templateID, userID, userID).First(&emailTemplate).Error; err != nil {
+		return emailTemplate, models.EmailService{}, fmt.Errorf("template not found: %w", err)
 	}
 
-	// Get email service (use default if not specified)
 	var emailService models.EmailService
-	if req.ServiceID != nil {
+	if serviceID != nil {
 		if err := s.db.Where("id = ? AND (user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?))",
-			*req.ServiceID, userID, userID).First(&emailService).Error; err != nil {
-			return nil, fmt.Errorf("email service not found: %w", err)
+			*serviceID, userID, userID).First(&emailService).Error; err != nil {
+			return emailTemplate, emailService, fmt.Errorf("email service not found: %w", err)
 		}
 	} else {
 		// Use default service
 		if err := s.db.Where("(user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?)) AND is_default = ?",
 			userID, userID, true).First(&emailService).Error; err != nil {
-			return nil, fmt.Errorf("no default email service found: %w", err)
+			return emailTemplate, emailService, fmt.Errorf("no default email service found: %w", err)
 		}
 	}
 
-	// Process template
+	return emailTemplate, emailService, nil
+}
+
+// prepareEmailContent processes the template and returns HTML, text, and subject
+func (s *EmailService) prepareEmailContent(emailTemplate models.Template, req models.EmailRequest) (string, string, string, error) {
 	subject := req.Subject
 	if subject == "" {
 		subject = emailTemplate.Subject
@@ -72,18 +124,18 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 
 	htmlContent, textContent, err := s.processTemplate(emailTemplate, req.TemplateParams, subject)
 	if err != nil {
-		return nil, fmt.Errorf("failed to process template: %w", err)
+		return "", "", "", fmt.Errorf("failed to process template: %w", err)
 	}
 
-	// Extract domain from service's from email for Message-ID
+	return htmlContent, textContent, subject, nil
+}
+
+// createEmailLog creates an email log entry and applies tracking if enabled
+func (s *EmailService) createEmailLog(emailTemplate models.Template, emailService models.EmailService, req models.EmailRequest, userID uuid.UUID, subject, htmlContent, textContent string) (*models.EmailLog, error) {
 	fromEmail := getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService)
-	domain := "leapmailr.local"
-	if parts := strings.Split(fromEmail, "@"); len(parts) == 2 {
-		domain = parts[1]
-	}
+	domain := extractDomain(fromEmail)
 
-	// Create email log entry with unique MessageID
-	emailLog := models.EmailLog{
+	emailLog := &models.EmailLog{
 		UserID:     &userID,
 		TemplateID: &emailTemplate.ID,
 		ServiceID:  &emailService.ID,
@@ -97,52 +149,74 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 		Metadata:   "{}",
 	}
 
-	if err := s.db.Create(&emailLog).Error; err != nil {
+	if err := s.db.Create(emailLog).Error; err != nil {
 		return nil, fmt.Errorf("failed to create email log: %w", err)
 	}
 
-	// Create tracking record and inject tracking elements (if enabled and HTML content exists)
+	// Apply tracking if enabled
 	if req.EnableTracking && htmlContent != "" {
-		trackingService := NewEmailTrackingService()
-		tracking, err := trackingService.CreateTracking(emailLog.ID)
-		if err == nil && tracking != nil {
-			// Get base URL from environment or configuration
-			baseURL := utils.GetBaseURL() // You'll need to implement this
-
-			// Inject tracking pixel
-			htmlContent = trackingService.InjectTrackingPixel(htmlContent, tracking.TrackingPixelID, baseURL)
-
-			// Inject link tracking
-			htmlContent = trackingService.InjectLinkTracking(htmlContent, tracking.TrackingPixelID, baseURL)
-		}
+		s.applyTracking(emailLog.ID, &htmlContent)
 	}
 
-	// Send email immediately or schedule
-	if req.ScheduleAt != nil && req.ScheduleAt.After(time.Now()) {
-		emailLog.Status = "scheduled"
-		s.db.Save(&emailLog)
-		// TODO: Add to job queue for scheduled sending
-		return &emailLog, nil
-	}
+	return emailLog, nil
+}
 
-	// Send email now
+// applyTracking injects tracking pixel and link tracking into HTML content
+func (s *EmailService) applyTracking(emailLogID uuid.UUID, htmlContent *string) {
+	trackingService := NewEmailTrackingService()
+	tracking, err := trackingService.CreateTracking(emailLogID)
+	if err == nil && tracking != nil {
+		baseURL := utils.GetBaseURL()
+		*htmlContent = trackingService.InjectTrackingPixel(*htmlContent, tracking.TrackingPixelID, baseURL)
+		*htmlContent = trackingService.InjectLinkTracking(*htmlContent, tracking.TrackingPixelID, baseURL)
+	}
+}
+
+// extractDomain extracts domain from email address
+func extractDomain(email string) string {
+	if parts := strings.Split(email, "@"); len(parts) == 2 {
+		return parts[1]
+	}
+	return defaultLocalhost
+}
+
+// isScheduled checks if the email should be scheduled
+func (s *EmailService) isScheduled(scheduleAt *time.Time) bool {
+	return scheduleAt != nil && scheduleAt.After(time.Now())
+}
+
+// scheduleEmail marks email as scheduled
+func (s *EmailService) scheduleEmail(emailLog *models.EmailLog) (*models.EmailLog, error) {
+	emailLog.Status = "scheduled"
+	s.db.Save(emailLog)
+	// TODO: Add to job queue for scheduled sending
+	return emailLog, nil
+}
+
+// sendImmediately sends the email via SMTP immediately
+func (s *EmailService) sendImmediately(emailService models.EmailService, emailTemplate models.Template, emailLog *models.EmailLog, htmlContent, textContent string, attachments []models.EmailAttachment) error {
 	log.Printf("Attempting to send email to %s via service %s", emailLog.ToEmail, emailService.Name)
-	err = s.sendEmailViaSMTP(emailService, emailTemplate, emailLog, htmlContent, textContent, req.Attachments)
+
+	err := s.sendEmailViaSMTP(emailService, emailTemplate, *emailLog, htmlContent, textContent, attachments)
 	if err != nil {
 		log.Printf("Failed to send email: %v", err)
 		emailLog.Status = "failed"
 		emailLog.ErrorMessage = err.Error()
-		s.db.Save(&emailLog)
-		return &emailLog, err
+		s.db.Save(emailLog)
+		return err
 	}
 
 	log.Printf("Email sent successfully to %s", emailLog.ToEmail)
 	emailLog.Status = "sent"
-	emailLog.SentAt = &time.Time{}
-	*emailLog.SentAt = time.Now()
-	s.db.Save(&emailLog)
+	now := time.Now()
+	emailLog.SentAt = &now
+	s.db.Save(emailLog)
 
-	// Send auto-reply if enabled (template-based or request override)
+	return nil
+}
+
+// handleAutoReply sends auto-reply if enabled
+func (s *EmailService) handleAutoReply(emailTemplate models.Template, emailService models.EmailService, req models.EmailRequest, userID uuid.UUID) {
 	autoReplyTemplateID := emailTemplate.AutoReplyTemplateID
 	if req.AutoReplyEnabled && req.AutoReplyTemplateID != nil {
 		// Request-level override
@@ -153,136 +227,146 @@ func (s *EmailService) SendEmail(req models.EmailRequest, userID uuid.UUID) (*mo
 		log.Printf("Auto-reply enabled for template %s, sending auto-reply using template %s", emailTemplate.Name, *autoReplyTemplateID)
 		go s.sendAutoReply(emailService, *autoReplyTemplateID, req.ToEmail, req.ToName, userID)
 	}
-
-	return &emailLog, nil
 }
 
 // generateMessageID generates a unique Message-ID for email tracking
 // Format: <uuid@domain> which is RFC-compliant
 func generateMessageID(domain string) string {
 	if domain == "" {
-		domain = "leapmailr.local"
+		domain = defaultLocalhost
 	}
 	return fmt.Sprintf("%s@%s", uuid.New().String(), domain)
 }
 
 // SendBulkEmail sends bulk emails
 func (s *EmailService) SendBulkEmail(req models.BulkEmailRequest, userID uuid.UUID) ([]models.EmailLog, error) {
-	var emailLogs []models.EmailLog
-
-	// Get template
-	var emailTemplate models.Template
-	if err := s.db.Where("id = ? AND (user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?))",
-		req.TemplateID, userID, userID).First(&emailTemplate).Error; err != nil {
-		return nil, fmt.Errorf("template not found: %w", err)
-	}
-
-	// Get email service
-	var emailService models.EmailService
-	if req.ServiceID != nil {
-		if err := s.db.Where("id = ? AND (user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?))",
-			*req.ServiceID, userID, userID).First(&emailService).Error; err != nil {
-			return nil, fmt.Errorf("email service not found: %w", err)
-		}
-	} else {
-		if err := s.db.Where("(user_id = ? OR organization_id IN (SELECT organization_id FROM user_organizations WHERE user_id = ?)) AND is_default = ?",
-			userID, userID, true).First(&emailService).Error; err != nil {
-			return nil, fmt.Errorf("no default email service found: %w", err)
-		}
+	// Get template and service
+	emailTemplate, emailService, err := s.getTemplateAndService(req.TemplateID, req.ServiceID, userID)
+	if err != nil {
+		return nil, err
 	}
 
 	// Process each recipient
+	return s.processRecipients(req, emailTemplate, emailService, userID)
+}
+
+// processRecipients processes all recipients and sends bulk emails
+func (s *EmailService) processRecipients(req models.BulkEmailRequest, emailTemplate models.Template, emailService models.EmailService, userID uuid.UUID) ([]models.EmailLog, error) {
+	var emailLogs []models.EmailLog
 	suppressionService := NewSuppressionService()
+
 	for _, recipient := range req.Recipients {
 		// Check suppression list
-		isSuppressed, _, err := suppressionService.IsEmailSuppressed(recipient.Email, userID)
-		if err != nil || isSuppressed {
-			// Skip suppressed emails
+		if s.isRecipientSuppressed(recipient.Email, userID, suppressionService) {
 			continue
 		}
 
-		// Merge default params with recipient-specific params
-		templateParams := make(map[string]interface{})
-		for k, v := range req.DefaultParams {
-			templateParams[k] = v
-		}
-		for k, v := range recipient.TemplateParams {
-			templateParams[k] = v
-		}
-
-		subject := req.Subject
-		if subject == "" {
-			subject = emailTemplate.Subject
-		}
-
-		htmlContent, textContent, err := s.processTemplate(emailTemplate, templateParams, subject)
+		// Process recipient's email
+		emailLog, htmlContent, textContent, err := s.processRecipient(req, recipient, emailTemplate, emailService, userID)
 		if err != nil {
-			continue // Skip this recipient on template error
+			continue // Skip this recipient on error
 		}
 
-		// Extract domain from service's from email for Message-ID
-		fromEmail := getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService)
-		domain := "leapmailr.local"
-		if parts := strings.Split(fromEmail, "@"); len(parts) == 2 {
-			domain = parts[1]
+		emailLogs = append(emailLogs, *emailLog)
+
+		// Send email (scheduled or immediate)
+		if s.isScheduled(req.ScheduleAt) {
+			s.scheduleBulkEmail(emailLog)
+		} else {
+			s.sendBulkEmailAsync(emailLog, emailService, emailTemplate, htmlContent, textContent, req.EnableTracking)
 		}
-
-		// Create email log entry with unique MessageID
-		emailLog := models.EmailLog{
-			UserID:     &userID,
-			TemplateID: &emailTemplate.ID,
-			ServiceID:  &emailService.ID,
-			FromEmail:  fromEmail,
-			FromName:   getFromNameWithTemplate(req.FromName, emailTemplate, emailService),
-			ToEmail:    recipient.Email,
-			ToName:     recipient.Name,
-			Subject:    subject,
-			Status:     "queued",
-			MessageID:  generateMessageID(domain),
-			Metadata:   "{}",
-		}
-
-		if err := s.db.Create(&emailLog).Error; err != nil {
-			continue // Skip on database error
-		}
-
-		emailLogs = append(emailLogs, emailLog)
-
-		// Schedule or send immediately
-		if req.ScheduleAt != nil && req.ScheduleAt.After(time.Now()) {
-			emailLog.Status = "scheduled"
-			s.db.Save(&emailLog)
-			// TODO: Add to job queue
-			continue
-		}
-
-		// Send email (in production, this should be queued)
-		go func(log models.EmailLog, html, text string, enableTracking bool) {
-			// Create tracking if enabled
-			if enableTracking && html != "" {
-				trackingService := NewEmailTrackingService()
-				tracking, err := trackingService.CreateTracking(log.ID)
-				if err == nil && tracking != nil {
-					baseURL := utils.GetBaseURL()
-					html = trackingService.InjectTrackingPixel(html, tracking.TrackingPixelID, baseURL)
-					html = trackingService.InjectLinkTracking(html, tracking.TrackingPixelID, baseURL)
-				}
-			}
-
-			err := s.sendEmailViaSMTP(emailService, emailTemplate, log, html, text, nil)
-			if err != nil {
-				log.Status = "failed"
-				log.ErrorMessage = err.Error()
-			} else {
-				log.Status = "sent"
-				now := time.Now()
-				log.SentAt = &now
-			}
-			s.db.Save(&log)
-		}(emailLog, htmlContent, textContent, req.EnableTracking)
 	}
 
 	return emailLogs, nil
+}
+
+// isRecipientSuppressed checks if recipient is in suppression list
+func (s *EmailService) isRecipientSuppressed(email string, userID uuid.UUID, suppressionService *SuppressionService) bool {
+	isSuppressed, _, err := suppressionService.IsEmailSuppressed(email, userID)
+	return err != nil || isSuppressed
+}
+
+// processRecipient processes a single recipient and creates email log
+func (s *EmailService) processRecipient(req models.BulkEmailRequest, recipient models.EmailRecipient, emailTemplate models.Template, emailService models.EmailService, userID uuid.UUID) (*models.EmailLog, string, string, error) {
+	// Merge template params
+	templateParams := mergeTemplateParams(req.DefaultParams, recipient.TemplateParams)
+
+	// Determine subject
+	subject := req.Subject
+	if subject == "" {
+		subject = emailTemplate.Subject
+	}
+
+	// Process template
+	htmlContent, textContent, err := s.processTemplate(emailTemplate, templateParams, subject)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	// Create email log
+	fromEmail := getFromEmailWithTemplate(req.FromEmail, emailTemplate, emailService)
+	domain := extractDomain(fromEmail)
+
+	emailLog := &models.EmailLog{
+		UserID:     &userID,
+		TemplateID: &emailTemplate.ID,
+		ServiceID:  &emailService.ID,
+		FromEmail:  fromEmail,
+		FromName:   getFromNameWithTemplate(req.FromName, emailTemplate, emailService),
+		ToEmail:    recipient.Email,
+		ToName:     recipient.Name,
+		Subject:    subject,
+		Status:     "queued",
+		MessageID:  generateMessageID(domain),
+		Metadata:   "{}",
+	}
+
+	if err := s.db.Create(emailLog).Error; err != nil {
+		return nil, "", "", err
+	}
+
+	return emailLog, htmlContent, textContent, nil
+}
+
+// mergeTemplateParams merges default and recipient-specific template params
+func mergeTemplateParams(defaultParams, recipientParams map[string]interface{}) map[string]interface{} {
+	templateParams := make(map[string]interface{})
+	for k, v := range defaultParams {
+		templateParams[k] = v
+	}
+	for k, v := range recipientParams {
+		templateParams[k] = v
+	}
+	return templateParams
+}
+
+// scheduleBulkEmail marks a bulk email as scheduled
+func (s *EmailService) scheduleBulkEmail(emailLog *models.EmailLog) {
+	emailLog.Status = "scheduled"
+	s.db.Save(emailLog)
+	// TODO: Add to job queue
+}
+
+// sendBulkEmailAsync sends a bulk email asynchronously
+func (s *EmailService) sendBulkEmailAsync(emailLog *models.EmailLog, emailService models.EmailService, emailTemplate models.Template, htmlContent, textContent string, enableTracking bool) {
+	go func(log models.EmailLog, html, text string, tracking bool) {
+		// Apply tracking if enabled
+		if tracking && html != "" {
+			s.applyTracking(log.ID, &html)
+		}
+
+		// Send email
+		err := s.sendEmailViaSMTP(emailService, emailTemplate, log, html, text, nil)
+		if err != nil {
+			log.Status = "failed"
+			log.ErrorMessage = err.Error()
+		} else {
+			log.Status = "sent"
+			now := time.Now()
+			log.SentAt = &now
+		}
+		s.db.Save(&log)
+	}(*emailLog, htmlContent, textContent, enableTracking)
 }
 
 // processTemplate processes a template with given parameters
@@ -454,7 +538,7 @@ func (s *EmailService) sendAutoReply(service models.EmailService, autoReplyTempl
 
 	// Create email log for auto-reply
 	fromEmail := getFromEmailWithTemplate("", autoReplyTemplate, service)
-	domain := "leapmailr.local"
+	domain := defaultLocalhost
 	if parts := strings.Split(fromEmail, "@"); len(parts) == 2 {
 		domain = parts[1]
 	}
@@ -512,7 +596,7 @@ func getFromEmailWithTemplate(reqFromEmail string, template models.Template, ser
 		return service.FromEmail
 	}
 	// Fallback
-	return "noreply@example.com"
+	return defaultNoReplyAddr
 }
 
 func getFromNameWithTemplate(reqFromName string, template models.Template, service models.EmailService) string {
@@ -557,7 +641,7 @@ func getFromEmail(reqFromEmail string, service models.EmailService) string {
 	if service.FromEmail != "" {
 		return service.FromEmail
 	}
-	return "noreply@example.com"
+	return defaultNoReplyAddr
 }
 
 func getFromName(reqFromName string, service models.EmailService) string {
@@ -619,7 +703,7 @@ func parseSMTPConfig(config string) struct {
 			Port:      587,
 			Username:  "user@example.com",
 			Password:  "password",
-			FromEmail: "noreply@example.com",
+			FromEmail: defaultNoReplyAddr,
 			UseTLS:    true,
 			UseSSL:    false,
 		}

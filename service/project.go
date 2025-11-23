@@ -10,6 +10,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// Project query constants
+const (
+	queryUserIDIsDefault = "user_id = ? AND is_default = ?"
+)
+
 // CreateProject creates a new project for a user
 func CreateProject(userID uuid.UUID, name, description, color string, isDefault bool) (*models.Project, error) {
 	db := database.GetDB()
@@ -17,7 +22,7 @@ func CreateProject(userID uuid.UUID, name, description, color string, isDefault 
 	// If this is set as default, unset other defaults for this user
 	if isDefault {
 		if err := db.Model(&models.Project{}).
-			Where("user_id = ? AND is_default = ?", userID, true).
+			Where(queryUserIDIsDefault, userID, true).
 			Update("is_default", false).Error; err != nil {
 			return nil, fmt.Errorf("failed to unset existing default: %w", err)
 		}
@@ -73,7 +78,7 @@ func GetDefaultProject(userID uuid.UUID) (*models.Project, error) {
 	db := database.GetDB()
 	var project models.Project
 
-	if err := db.Where("user_id = ? AND is_default = ?", userID, true).
+	if err := db.Where(queryUserIDIsDefault, userID, true).
 		First(&project).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("no default project found")
@@ -179,7 +184,7 @@ func SetDefaultProject(projectID, userID uuid.UUID) error {
 
 	// Unset all defaults for this user
 	if err := db.Model(&models.Project{}).
-		Where("user_id = ? AND is_default = ?", userID, true).
+		Where(queryUserIDIsDefault, userID, true).
 		Update("is_default", false).Error; err != nil {
 		return fmt.Errorf("failed to unset existing defaults: %w", err)
 	}

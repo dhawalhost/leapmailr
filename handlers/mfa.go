@@ -9,6 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// MFA error messages
+const (
+	errInvalidPassword = "Invalid password"
+	errInvalidMFACode  = "Invalid MFA code"
+)
+
 var mfaService *service.MFAService
 
 // InitMFAService initializes the MFA service
@@ -38,7 +44,7 @@ func SetupMFAHandler(c *gin.Context) {
 			return
 		}
 		if err == service.ErrInvalidPassword {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": errInvalidPassword})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to setup MFA"})
@@ -69,7 +75,7 @@ func VerifyMFASetupHandler(c *gin.Context) {
 			return
 		}
 		if err == service.ErrInvalidMFACode {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid MFA code"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidMFACode})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify MFA setup"})
@@ -100,11 +106,11 @@ func DisableMFAHandler(c *gin.Context) {
 			return
 		}
 		if err == service.ErrInvalidPassword {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": errInvalidPassword})
 			return
 		}
 		if err == service.ErrInvalidMFACode {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid MFA code"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidMFACode})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to disable MFA"})
@@ -136,11 +142,11 @@ func RegenerateBackupCodesHandler(c *gin.Context) {
 			return
 		}
 		if err == service.ErrInvalidPassword {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid password"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": errInvalidPassword})
 			return
 		}
 		if err == service.ErrInvalidMFACode {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid MFA code"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidMFACode})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to regenerate backup codes"})

@@ -31,9 +31,9 @@ log "SECRET ROTATION STARTED"
 log "=========================================="
 
 # Check if running in production
-if [ "$ENVIRONMENT" = "production" ]; then
+if [[ "$ENVIRONMENT" = "production" ]]; then
     read -p "WARNING: This will rotate production secrets. Continue? (yes/no): " -r
-    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]]; then
         log "Rotation cancelled by user"
         exit 0
     fi
@@ -64,7 +64,7 @@ rotate_jwt_secret() {
     # Get current secret
     CURRENT_JWT=$(grep "^JWT_SECRET=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
     
-    if [ -n "$CURRENT_JWT" ]; then
+    if [[ -n "$CURRENT_JWT" ]]; then
         backup_secret "JWT_SECRET" "$CURRENT_JWT"
     fi
     
@@ -87,7 +87,7 @@ rotate_encryption_key() {
     
     CURRENT_KEY=$(grep "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
     
-    if [ -n "$CURRENT_KEY" ]; then
+    if [[ -n "$CURRENT_KEY" ]]; then
         backup_secret "ENCRYPTION_KEY" "$CURRENT_KEY"
     fi
     
@@ -110,7 +110,7 @@ rotate_db_password() {
     
     CURRENT_PASS=$(grep "^DB_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
     
-    if [ -n "$CURRENT_PASS" ]; then
+    if [[ -n "$CURRENT_PASS" ]]; then
         backup_secret "DB_PASSWORD" "$CURRENT_PASS"
     fi
     
@@ -168,7 +168,7 @@ rotate_redis_password() {
         
         CURRENT_REDIS=$(grep "^REDIS_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
         
-        if [ -n "$CURRENT_REDIS" ]; then
+        if [[ -n "$CURRENT_REDIS" ]]; then
             backup_secret "REDIS_PASSWORD" "$CURRENT_REDIS"
         fi
         

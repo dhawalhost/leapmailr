@@ -8,6 +8,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// Project error messages
+const (
+	errUserNotAuthenticated = "User not authenticated"
+	errInvalidProjectID     = "Invalid project ID"
+)
+
 // CreateProjectRequest represents the request body for creating a project
 type CreateProjectRequest struct {
 	Name        string `json:"name" binding:"required"`
@@ -28,7 +34,7 @@ type UpdateProjectRequest struct {
 func CreateProject(c *gin.Context) {
 	user, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errUserNotAuthenticated})
 		return
 	}
 
@@ -56,7 +62,7 @@ func CreateProject(c *gin.Context) {
 func GetProjects(c *gin.Context) {
 	user, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errUserNotAuthenticated})
 		return
 	}
 
@@ -73,13 +79,13 @@ func GetProjects(c *gin.Context) {
 func GetProject(c *gin.Context) {
 	user, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errUserNotAuthenticated})
 		return
 	}
 
 	projectID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidProjectID})
 		return
 	}
 
@@ -96,13 +102,13 @@ func GetProject(c *gin.Context) {
 func UpdateProject(c *gin.Context) {
 	user, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errUserNotAuthenticated})
 		return
 	}
 
 	projectID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidProjectID})
 		return
 	}
 
@@ -125,13 +131,13 @@ func UpdateProject(c *gin.Context) {
 func DeleteProject(c *gin.Context) {
 	user, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errUserNotAuthenticated})
 		return
 	}
 
 	projectID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidProjectID})
 		return
 	}
 
@@ -147,13 +153,13 @@ func DeleteProject(c *gin.Context) {
 func SetDefaultProject(c *gin.Context) {
 	user, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errUserNotAuthenticated})
 		return
 	}
 
 	projectID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidProjectID})
 		return
 	}
 
@@ -169,7 +175,7 @@ func SetDefaultProject(c *gin.Context) {
 func GetDefaultProject(c *gin.Context) {
 	user, err := GetUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errUserNotAuthenticated})
 		return
 	}
 

@@ -14,7 +14,7 @@ SERVICE_NAME="leapmailr"
 BINARY_NAME="leapmailr"
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then 
+if [[ "$EUID" -ne 0 ]]; then 
     echo "❌ Please run as root (use sudo)"
     exit 1
 fi
@@ -103,7 +103,7 @@ echo "✓ Environment file created"
 echo ""
 echo "📦 Step 5: Installing systemd service..."
 # Copy systemd service file
-if [ -f "./leapmailr.service" ]; then
+if [[ -f "./leapmailr.service" ]]; then
     cp ./leapmailr.service /etc/systemd/system/
     systemctl daemon-reload
     echo "✓ Service file installed"
@@ -113,7 +113,7 @@ fi
 
 echo ""
 echo "📦 Step 6: Installing binary..."
-if [ -f "./$BINARY_NAME" ]; then
+if [[ -f "./$BINARY_NAME" ]]; then
     cp ./$BINARY_NAME $APP_DIR/
     chmod +x $APP_DIR/$BINARY_NAME
     chown $APP_USER:$APP_USER $APP_DIR/$BINARY_NAME

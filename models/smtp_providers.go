@@ -1,5 +1,14 @@
 package models
 
+// Common string constants for SMTP provider configuration
+const (
+	DefaultFromEmail       = "noreply@yourdomain.com"
+	DefaultFromDescription = "The email address to send from"
+	LabelAPIKey            = "API Key"
+	LabelSMTPUsername      = "SMTP Username"
+	LabelSMTPPassword      = "SMTP Password"
+)
+
 // SMTPProvider represents a pre-configured SMTP provider
 type SMTPProvider struct {
 	ID           string              `json:"id"`
@@ -62,7 +71,7 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://documentation.mailgun.com/en/latest/user_manual.html#sending-via-smtp",
 			Logo:         "/providers/mailgun.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from"),
+				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				UsernameField("SMTP Username", "postmaster@yourdomain.com", "Your Mailgun SMTP username"),
 				PasswordField("SMTP Password", "Your Mailgun SMTP password"),
 			},
@@ -117,7 +126,7 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://developers.sparkpost.com/api/smtp/",
 			Logo:         "/providers/sparkpost.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from"),
+				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				FixedUsernameField("SMTP Username", "SMTP_Injection", "Use 'SMTP_Injection' as username"),
 				APIKeyPasswordField("API Key", "", "Your SparkPost API Key"),
 			},
@@ -135,7 +144,7 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://help.brevo.com/hc/en-us/articles/209467485",
 			Logo:         "/providers/brevo.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from"),
+				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				EmailUsernameField("Login Email", "your@email.com", "Your Brevo account email"),
 				PasswordField("SMTP Key", "Your Brevo SMTP key (not account password)"),
 			},
@@ -153,7 +162,7 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://dev.mailjet.com/smtp-relay/configuration/",
 			Logo:         "/providers/mailjet.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from"),
+				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				UsernameField("API Key", "", "Your Mailjet API Key"),
 				PasswordField("Secret Key", "Your Mailjet Secret Key"),
 			},
@@ -171,7 +180,7 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://elasticemail.com/resources/usage/sending-emails-via-smtp/",
 			Logo:         "/providers/elastic-email.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from"),
+				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				EmailUsernameField("Account Email", "your@email.com", "Your Elastic Email account email"),
 				PasswordField("SMTP Password", "Your Elastic Email SMTP password or API key"),
 			},
@@ -322,7 +331,7 @@ func GetSMTPProviders() []SMTPProvider {
 			Category:     "smtp",
 			Logo:         "/providers/custom.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from"),
+				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				{
 					Key:         "host",
 					Label:       "SMTP Host",

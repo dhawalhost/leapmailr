@@ -74,51 +74,81 @@ func EnhancedRateLimiter(config *RateLimitConfig) gin.HandlerFunc {
 	initRateLimiter(config)
 
 	return func(c *gin.Context) {
-		// Get identifiers
 		ip := c.ClientIP()
 		endpoint := c.Request.URL.Path
 
 		// Check per-IP rate limit
-		ipKey := fmt.Sprintf("ip:%s", ip)
-		if !limiter.allow(ipKey, config.PerIP) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "Too many requests from your IP address. Please try again later.",
-				"retry_after": int(config.Window.Seconds()),
-			})
-			c.Abort()
+		if !checkIPRateLimit(c, ip, config) {
 			return
 		}
 
 		// Check per-endpoint rate limit
-		if limit, exists := config.PerEndpoint[endpoint]; exists {
-			endpointKey := fmt.Sprintf("endpoint:%s:%s", ip, endpoint)
-			if !limiter.allow(endpointKey, limit) {
-				c.JSON(http.StatusTooManyRequests, gin.H{
-					"error":       fmt.Sprintf("Too many requests to this endpoint. Limit: %d per %s", limit, config.Window),
-					"retry_after": int(config.Window.Seconds()),
-				})
-				c.Abort()
-				return
-			}
+		if !checkEndpointRateLimit(c, ip, endpoint, config) {
+			return
 		}
 
 		// Check per-user rate limit (if authenticated)
-		if userID, exists := c.Get("userID"); exists {
-			if uid, ok := userID.(uuid.UUID); ok {
-				userKey := fmt.Sprintf("user:%s", uid.String())
-				if !limiter.allow(userKey, config.PerUser) {
-					c.JSON(http.StatusTooManyRequests, gin.H{
-						"error":       "You have exceeded your request quota. Please try again later.",
-						"retry_after": int(config.Window.Seconds()),
-					})
-					c.Abort()
-					return
-				}
-			}
+		if !checkUserRateLimit(c, config) {
+			return
 		}
 
 		c.Next()
 	}
+}
+
+// checkIPRateLimit checks and enforces per-IP rate limits
+func checkIPRateLimit(c *gin.Context, ip string, config *RateLimitConfig) bool {
+	ipKey := fmt.Sprintf("ip:%s", ip)
+	if !limiter.allow(ipKey, config.PerIP) {
+		abortWithRateLimit(c, "Too many requests from your IP address. Please try again later.", config.Window)
+		return false
+	}
+	return true
+}
+
+// checkEndpointRateLimit checks and enforces per-endpoint rate limits
+func checkEndpointRateLimit(c *gin.Context, ip, endpoint string, config *RateLimitConfig) bool {
+	limit, exists := config.PerEndpoint[endpoint]
+	if !exists {
+		return true
+	}
+
+	endpointKey := fmt.Sprintf("endpoint:%s:%s", ip, endpoint)
+	if !limiter.allow(endpointKey, limit) {
+		errorMsg := fmt.Sprintf("Too many requests to this endpoint. Limit: %d per %s", limit, config.Window)
+		abortWithRateLimit(c, errorMsg, config.Window)
+		return false
+	}
+	return true
+}
+
+// checkUserRateLimit checks and enforces per-user rate limits
+func checkUserRateLimit(c *gin.Context, config *RateLimitConfig) bool {
+	userID, exists := c.Get("userID")
+	if !exists {
+		return true
+	}
+
+	uid, ok := userID.(uuid.UUID)
+	if !ok {
+		return true
+	}
+
+	userKey := fmt.Sprintf("user:%s", uid.String())
+	if !limiter.allow(userKey, config.PerUser) {
+		abortWithRateLimit(c, "You have exceeded your request quota. Please try again later.", config.Window)
+		return false
+	}
+	return true
+}
+
+// abortWithRateLimit aborts the request with rate limit error
+func abortWithRateLimit(c *gin.Context, message string, window time.Duration) {
+	c.JSON(http.StatusTooManyRequests, gin.H{
+		"error":       message,
+		"retry_after": int(window.Seconds()),
+	})
+	c.Abort()
 }
 
 // allow checks if a request should be allowed

@@ -14,6 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// Secrets error messages
+const (
+	errFailedSaveMetadata = "Failed to save metadata"
+)
+
 // SecretProvider defines the interface for secret management backends
 type SecretProvider interface {
 	GetSecret(ctx context.Context, key string) (string, error)
@@ -129,7 +134,7 @@ func (sm *SecretsManager) SetSecret(ctx context.Context, key, value string) erro
 	}
 
 	if err := sm.saveMetadata(); err != nil {
-		sm.logger.Warn("Failed to save metadata", zap.Error(err))
+		sm.logger.Warn(errFailedSaveMetadata, zap.Error(err))
 	}
 
 	logging.AuditLog(ctx, "secret_update", "secret", map[string]interface{}{
@@ -154,7 +159,7 @@ func (sm *SecretsManager) DeleteSecret(ctx context.Context, key string) error {
 
 	delete(sm.metadata, key)
 	if err := sm.saveMetadata(); err != nil {
-		sm.logger.Warn("Failed to save metadata", zap.Error(err))
+		sm.logger.Warn(errFailedSaveMetadata, zap.Error(err))
 	}
 
 	logging.AuditLog(ctx, "secret_delete", "secret", map[string]interface{}{
@@ -201,7 +206,7 @@ func (sm *SecretsManager) RotateSecret(ctx context.Context, key string) (string,
 	}
 
 	if err := sm.saveMetadata(); err != nil {
-		sm.logger.Warn("Failed to save metadata", zap.Error(err))
+		sm.logger.Warn(errFailedSaveMetadata, zap.Error(err))
 	}
 
 	logging.AuditLog(ctx, "secret_rotate", "secret", map[string]interface{}{

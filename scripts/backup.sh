@@ -54,7 +54,7 @@ else
 fi
 
 # Verify backup file exists
-if [ ! -f "$BACKUP_FILE" ]; then
+if [[ ! -f "$BACKUP_FILE" ]]; then
     error_exit "Backup file not found: $BACKUP_FILE"
 fi
 

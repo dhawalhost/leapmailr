@@ -10,6 +10,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// Webhook error messages
+const (
+	errFailedFindEmailLog = "failed to find email log: %w"
+)
+
 // WebhookTrackingService handles email delivery tracking via webhooks
 type WebhookTrackingService struct {
 	db *gorm.DB
@@ -38,107 +43,155 @@ type EmailEvent struct {
 // ProcessWebhookEvent processes a webhook event and updates email status
 func (s *WebhookTrackingService) ProcessWebhookEvent(event EmailEvent) error {
 	// Find email log by message ID or recipient email
-	var emailLog models.EmailLog
-	var err error
-
-	if event.MessageID != "" {
-		// Try to find by message ID first (most reliable)
-		err = s.db.Where("message_id = ?", event.MessageID).First(&emailLog).Error
-	} else if event.Email != "" {
-		// Fallback to finding by email (less reliable, get most recent)
-		err = s.db.Where("to_email = ?", event.Email).Order("created_at DESC").First(&emailLog).Error
-	} else {
-		return fmt.Errorf("webhook event missing both message_id and email")
-	}
-
+	emailLog, err := s.findEmailLog(event.MessageID, event.Email)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// This might be an email sent outside our system, ignore gracefully
-			return nil
-		}
-		return fmt.Errorf("failed to find email log: %w", err)
+		return err
 	}
-
-	// Update email status based on event type
-	now := time.Now()
-	updates := make(map[string]interface{})
-
-	switch event.Event {
-	case "delivered":
-		updates["status"] = "delivered"
-		updates["delivered_at"] = now
-		if emailLog.SentAt == nil {
-			updates["sent_at"] = now
-		}
-
-	case "bounced", "bounce", "failed", "dropped":
-		updates["status"] = "bounced"
-		if event.Reason != "" {
-			updates["error_message"] = event.Reason
-		}
-
-	case "opened", "open":
-		// Only update if not already in a final state
-		if emailLog.Status != "bounced" && emailLog.Status != "failed" {
-			updates["status"] = "opened"
-			updates["opened_at"] = now
-			if emailLog.DeliveredAt == nil {
-				updates["delivered_at"] = now
-			}
-		}
-
-	case "clicked", "click":
-		// Only update if not already in a final state
-		if emailLog.Status != "bounced" && emailLog.Status != "failed" {
-			updates["status"] = "clicked"
-			updates["clicked_at"] = now
-			if emailLog.OpenedAt == nil {
-				updates["opened_at"] = now
-			}
-			if emailLog.DeliveredAt == nil {
-				updates["delivered_at"] = now
-			}
-		}
-
-	case "complained", "spamreport", "spam":
-		updates["status"] = "failed"
-		updates["error_message"] = "Marked as spam"
-		// Also add to suppression list
-		if emailLog.UserID != nil {
-			suppressionService := NewSuppressionService()
-			suppressionService.AddSuppressionFromWebhook(
-				emailLog.ToEmail,
-				models.SuppressionComplaint,
-				event.Metadata,
-				emailLog.UserID,
-			)
-		}
-
-	case "unsubscribed", "unsubscribe":
-		// Add to suppression list
-		if emailLog.UserID != nil {
-			suppressionService := NewSuppressionService()
-			suppressionService.AddSuppressionFromWebhook(
-				emailLog.ToEmail,
-				models.SuppressionUnsubscribe,
-				event.Metadata,
-				emailLog.UserID,
-			)
-		}
-
-	default:
-		// Unknown event type, log but don't fail
+	if emailLog == nil {
+		// Email not found in our system, ignore gracefully
 		return nil
 	}
 
+	// Build updates based on event type
+	updates := s.buildUpdatesForEvent(event, emailLog)
+
+	// Handle suppression list updates for spam/unsubscribe
+	s.handleSuppressionEvents(event, emailLog)
+
 	// Update the email log
 	if len(updates) > 0 {
-		if err := s.db.Model(&emailLog).Updates(updates).Error; err != nil {
+		if err := s.db.Model(emailLog).Updates(updates).Error; err != nil {
 			return fmt.Errorf("failed to update email log: %w", err)
 		}
 	}
 
 	return nil
+}
+
+// findEmailLog finds an email log by message ID or email address
+func (s *WebhookTrackingService) findEmailLog(messageID, email string) (*models.EmailLog, error) {
+	var emailLog models.EmailLog
+	var err error
+
+	if messageID != "" {
+		// Try to find by message ID first (most reliable)
+		err = s.db.Where("message_id = ?", messageID).First(&emailLog).Error
+	} else if email != "" {
+		// Fallback to finding by email (less reliable, get most recent)
+		err = s.db.Where("to_email = ?", email).Order("created_at DESC").First(&emailLog).Error
+	} else {
+		return nil, fmt.Errorf("webhook event missing both message_id and email")
+	}
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf(errFailedFindEmailLog, err)
+	}
+
+	return &emailLog, nil
+}
+
+// buildUpdatesForEvent creates update map based on event type
+func (s *WebhookTrackingService) buildUpdatesForEvent(event EmailEvent, emailLog *models.EmailLog) map[string]interface{} {
+	now := time.Now()
+	updates := make(map[string]interface{})
+
+	switch event.Event {
+	case "delivered":
+		s.handleDeliveredEvent(updates, emailLog, now)
+	case "bounced", "bounce", "failed", "dropped":
+		s.handleBouncedEvent(updates, event)
+	case "opened", "open":
+		s.handleOpenedEvent(updates, emailLog, now)
+	case "clicked", "click":
+		s.handleClickedEvent(updates, emailLog, now)
+	case "complained", "spamreport", "spam":
+		s.handleComplaintEvent(updates)
+	case "unsubscribed", "unsubscribe":
+		// Handled in handleSuppressionEvents
+	default:
+		// Unknown event type, log but don't fail
+	}
+
+	return updates
+}
+
+// handleDeliveredEvent handles delivered event updates
+func (s *WebhookTrackingService) handleDeliveredEvent(updates map[string]interface{}, emailLog *models.EmailLog, now time.Time) {
+	updates["status"] = "delivered"
+	updates["delivered_at"] = now
+	if emailLog.SentAt == nil {
+		updates["sent_at"] = now
+	}
+}
+
+// handleBouncedEvent handles bounced/failed event updates
+func (s *WebhookTrackingService) handleBouncedEvent(updates map[string]interface{}, event EmailEvent) {
+	updates["status"] = "bounced"
+	if event.Reason != "" {
+		updates["error_message"] = event.Reason
+	}
+}
+
+// handleOpenedEvent handles opened event updates
+func (s *WebhookTrackingService) handleOpenedEvent(updates map[string]interface{}, emailLog *models.EmailLog, now time.Time) {
+	// Only update if not already in a final state
+	if emailLog.Status != "bounced" && emailLog.Status != "failed" {
+		updates["status"] = "opened"
+		updates["opened_at"] = now
+		if emailLog.DeliveredAt == nil {
+			updates["delivered_at"] = now
+		}
+	}
+}
+
+// handleClickedEvent handles clicked event updates
+func (s *WebhookTrackingService) handleClickedEvent(updates map[string]interface{}, emailLog *models.EmailLog, now time.Time) {
+	// Only update if not already in a final state
+	if emailLog.Status != "bounced" && emailLog.Status != "failed" {
+		updates["status"] = "clicked"
+		updates["clicked_at"] = now
+		if emailLog.OpenedAt == nil {
+			updates["opened_at"] = now
+		}
+		if emailLog.DeliveredAt == nil {
+			updates["delivered_at"] = now
+		}
+	}
+}
+
+// handleComplaintEvent handles spam complaint event updates
+func (s *WebhookTrackingService) handleComplaintEvent(updates map[string]interface{}) {
+	updates["status"] = "failed"
+	updates["error_message"] = "Marked as spam"
+}
+
+// handleSuppressionEvents adds email to suppression list for spam/unsubscribe events
+func (s *WebhookTrackingService) handleSuppressionEvents(event EmailEvent, emailLog *models.EmailLog) {
+	if emailLog.UserID == nil {
+		return
+	}
+
+	suppressionService := NewSuppressionService()
+
+	switch event.Event {
+	case "complained", "spamreport", "spam":
+		suppressionService.AddSuppressionFromWebhook(
+			emailLog.ToEmail,
+			models.SuppressionComplaint,
+			event.Metadata,
+			emailLog.UserID,
+		)
+	case "unsubscribed", "unsubscribe":
+		suppressionService.AddSuppressionFromWebhook(
+			emailLog.ToEmail,
+			models.SuppressionUnsubscribe,
+			event.Metadata,
+			emailLog.UserID,
+		)
+	}
 }
 
 // UpdateEmailStatusByMessageID updates email status by message ID
@@ -148,7 +201,7 @@ func (s *WebhookTrackingService) UpdateEmailStatusByMessageID(messageID, status 
 		if err == gorm.ErrRecordNotFound {
 			return nil // Email not found in our system, ignore
 		}
-		return fmt.Errorf("failed to find email log: %w", err)
+		return fmt.Errorf(errFailedFindEmailLog, err)
 	}
 
 	updates := map[string]interface{}{
@@ -180,7 +233,7 @@ func (s *WebhookTrackingService) UpdateEmailStatusByEmail(email, status string, 
 		if err == gorm.ErrRecordNotFound {
 			return nil // Email not found, ignore
 		}
-		return fmt.Errorf("failed to find email log: %w", err)
+		return fmt.Errorf(errFailedFindEmailLog, err)
 	}
 
 	updates := map[string]interface{}{

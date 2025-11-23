@@ -88,24 +88,41 @@ func TestValidatePaginationParams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			limit, offset, err := ValidatePaginationParams(tt.limitStr, tt.offsetStr)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidatePaginationParams() error = %v, wantErr %v", err, tt.wantErr)
+			// Check error expectation
+			if !checkTestError(t, err, tt.wantErr, tt.errContains) {
 				return
 			}
 
-			if tt.wantErr && !strings.Contains(err.Error(), tt.errContains) {
-				t.Errorf("Error message '%s' does not contain '%s'", err.Error(), tt.errContains)
-			}
-
+			// Verify results for non-error cases
 			if !tt.wantErr {
-				if limit != tt.wantLimit {
-					t.Errorf("limit = %d, want %d", limit, tt.wantLimit)
-				}
-				if offset != tt.wantOffset {
-					t.Errorf("offset = %d, want %d", offset, tt.wantOffset)
-				}
+				verifyPaginationResults(t, limit, offset, tt.wantLimit, tt.wantOffset)
 			}
 		})
+	}
+}
+
+// checkTestError verifies test error expectations
+func checkTestError(t *testing.T, err error, wantErr bool, errContains string) bool {
+	if (err != nil) != wantErr {
+		t.Errorf("error = %v, wantErr %v", err, wantErr)
+		return false
+	}
+
+	if wantErr && !strings.Contains(err.Error(), errContains) {
+		t.Errorf("Error message '%s' does not contain '%s'", err.Error(), errContains)
+		return false
+	}
+
+	return true
+}
+
+// verifyPaginationResults verifies pagination parameter results
+func verifyPaginationResults(t *testing.T, limit, offset, wantLimit, wantOffset int) {
+	if limit != wantLimit {
+		t.Errorf("limit = %d, want %d", limit, wantLimit)
+	}
+	if offset != wantOffset {
+		t.Errorf("offset = %d, want %d", offset, wantOffset)
 	}
 }
 

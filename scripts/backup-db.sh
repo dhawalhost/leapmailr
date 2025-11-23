@@ -111,12 +111,12 @@ send_email() {
 # Function to cleanup on error
 cleanup_on_error() {
     log_error "Backup failed. Cleaning up..."
-    if [ -f "$BACKUP_FILE" ]; then
+    if [[ -f "$BACKUP_FILE" ]]; then
         rm -f "$BACKUP_FILE"
         log "Removed incomplete backup file: $BACKUP_FILE"
     fi
     
-    if [ "$SEND_FAILURE_EMAIL" = "true" ]; then
+    if [[ "$SEND_FAILURE_EMAIL" = "true" ]]; then
         send_email "❌ Leapmailr Backup Failed - $(date +%Y-%m-%d)" \
             "Database backup for $DB_NAME failed at $(date).
             
@@ -172,7 +172,7 @@ log "Backup directory ready: $BACKUP_DIR"
 
 # Check available disk space (require at least 1GB free)
 AVAILABLE_SPACE=$(df -BG "$BACKUP_DIR" | tail -1 | awk '{print $4}' | sed 's/G//')
-if [ "$AVAILABLE_SPACE" -lt 1 ]; then
+if [[ "$AVAILABLE_SPACE" -lt 1 ]]; then
     log_error "Insufficient disk space. Available: ${AVAILABLE_SPACE}GB, Required: 1GB"
     cleanup_on_error
 fi
@@ -199,7 +199,7 @@ END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
 # Check if backup file was created
-if [ ! -f "$BACKUP_FILE" ]; then
+if [[ ! -f "$BACKUP_FILE" ]]; then
     log_error "Backup file was not created"
     cleanup_on_error
 fi
@@ -228,7 +228,7 @@ aws s3 cp "$BACKUP_FILE" "$S3_BUCKET/" \
     --metadata "database=$DB_NAME,timestamp=$TIMESTAMP,server=$(hostname)" \
     --only-show-errors
 
-if [ $? -eq 0 ]; then
+if [[ $? -eq 0 ]]; then
     UPLOAD_END=$(date +%s)
     UPLOAD_DURATION=$((UPLOAD_END - UPLOAD_START))
     log_success "Uploaded to S3 in ${UPLOAD_DURATION} seconds"
@@ -240,7 +240,7 @@ fi
 # Step 4: Verify S3 upload
 log "Verifying S3 upload..."
 S3_FILE_SIZE=$(aws s3 ls "$S3_BUCKET/$BACKUP_FILENAME" --human-readable | awk '{print $3 " " $4}')
-if [ -n "$S3_FILE_SIZE" ]; then
+if [[ -n "$S3_FILE_SIZE" ]]; then
     log_success "S3 verification passed. Remote size: $S3_FILE_SIZE"
 else
     log_error "S3 verification failed - file not found on S3"
@@ -264,7 +264,7 @@ aws s3api copy-object \
 # Step 6: Clean up old local backups
 log "Cleaning up old local backups (keeping last $MAX_LOCAL_BACKUPS)..."
 LOCAL_BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/leapmailr_*.sql.gz 2>/dev/null | wc -l)
-if [ "$LOCAL_BACKUP_COUNT" -gt "$MAX_LOCAL_BACKUPS" ]; then
+if [[ "$LOCAL_BACKUP_COUNT" -gt "$MAX_LOCAL_BACKUPS" ]]; then
     OLD_BACKUPS=$(ls -1t "$BACKUP_DIR"/leapmailr_*.sql.gz | tail -n +$((MAX_LOCAL_BACKUPS + 1)))
     echo "$OLD_BACKUPS" | while read -r old_file; do
         rm -f "$old_file"
@@ -283,7 +283,7 @@ aws s3 ls "$S3_BUCKET/" | while read -r line; do
     FILE_DATE=$(echo "$line" | awk '{print $4}' | grep -oP 'leapmailr_\K\d{8}' || echo "")
     FILE_NAME=$(echo "$line" | awk '{print $4}')
     
-    if [ -n "$FILE_DATE" ] && [ "$FILE_DATE" -lt "$CUTOFF_DATE" ]; then
+    if [[ -n "$FILE_DATE" ]] && [ "$FILE_DATE" -lt "$CUTOFF_DATE" ]]; then
         aws s3 rm "$S3_BUCKET/$FILE_NAME" --only-show-errors
         log "Deleted old S3 backup: $FILE_NAME (date: $FILE_DATE)"
     fi
@@ -308,7 +308,7 @@ log "  - Checksum: $CHECKSUM"
 log "========================================="
 
 # Send success email if configured
-if [ "$SEND_SUCCESS_EMAIL" = "true" ]; then
+if [[ "$SEND_SUCCESS_EMAIL" = "true" ]]; then
     send_email "✅ Leapmailr Backup Successful - $(date +%Y-%m-%d)" \
         "Database backup completed successfully at $(date).
 
