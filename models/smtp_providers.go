@@ -246,7 +246,7 @@ func GetSMTPProviders() []SMTPProvider {
 			Category:     "smtp",
 			HelpURL:      "https://support.apple.com/en-us/HT202304",
 			Logo:         "/providers/icloud.svg",
-			Fields: AppPasswordSMTPFields("your-email@icloud.com", "iCloud"),
+			Fields:       AppPasswordSMTPFields("your-email@icloud.com", "iCloud"),
 		},
 		{
 			ID:           "fastmail",
@@ -260,7 +260,7 @@ func GetSMTPProviders() []SMTPProvider {
 			Category:     "smtp",
 			HelpURL:      "https://www.fastmail.help/hc/en-us/articles/1500000278342",
 			Logo:         "/providers/fastmail.svg",
-			Fields: AppPasswordSMTPFields("your-email@fastmail.com", "Fastmail"),
+			Fields:       AppPasswordSMTPFields("your-email@fastmail.com", "Fastmail"),
 		},
 		{
 			ID:           "protonmail",

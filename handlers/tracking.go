@@ -13,7 +13,7 @@ import (
 // TrackOpenHandler handles email open tracking via pixel
 func TrackOpenHandler(c *gin.Context) {
 	trackingPixelID := c.Param("pixel_id")
-	
+
 	// Validate tracking ID
 	if err := utils.ValidateTrackingID(trackingPixelID); err != nil {
 		// Return transparent pixel anyway (don't reveal tracking failure)

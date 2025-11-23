@@ -87,16 +87,16 @@ func TestValidatePaginationParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			limit, offset, err := ValidatePaginationParams(tt.limitStr, tt.offsetStr)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidatePaginationParams() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.wantErr && !strings.Contains(err.Error(), tt.errContains) {
 				t.Errorf("Error message '%s' does not contain '%s'", err.Error(), tt.errContains)
 			}
-			
+
 			if !tt.wantErr {
 				if limit != tt.wantLimit {
 					t.Errorf("limit = %d, want %d", limit, tt.wantLimit)
