@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -171,31 +171,43 @@ func ListTemplatesHandler(c *gin.Context) {
 	// Parse project_id if provided
 	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
 		projectID, err := uuid.Parse(projectIDStr)
-		if err == nil {
-			filters.ProjectID = &projectID
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+			return
 		}
+		filters.ProjectID = &projectID
 	}
 
+	// Parse is_active if provided
 	if isActiveStr := c.Query("is_active"); isActiveStr != "" {
-		if isActive, err := strconv.ParseBool(isActiveStr); err == nil {
-			filters.IsActive = &isActive
+		isActive, err := utils.ValidateBooleanParam(isActiveStr, "is_active")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
+		filters.IsActive = &isActive
 	}
 
-	filters.Name = c.Query("name")
+	// Sanitize name search
+	if name := c.Query("name"); name != "" {
+		sanitized, err := utils.SanitizeSearchQuery(name)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		filters.Name = sanitized
+	}
+
 	filters.OrderBy = c.Query("order_by")
 
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if limit, err := strconv.Atoi(limitStr); err == nil {
-			filters.Limit = limit
-		}
+	// Validate pagination params
+	limit, offset, err := utils.ValidatePaginationParams(c.Query("limit"), c.Query("offset"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if offset, err := strconv.Atoi(offsetStr); err == nil {
-			filters.Offset = offset
-		}
-	}
+	filters.Limit = limit
+	filters.Offset = offset
 
 	templates, err := templateService.ListTemplates(user.ID, filters)
 	if err != nil {

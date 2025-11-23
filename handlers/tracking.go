@@ -13,7 +13,9 @@ import (
 // TrackOpenHandler handles email open tracking via pixel
 func TrackOpenHandler(c *gin.Context) {
 	trackingPixelID := c.Param("pixel_id")
-	if trackingPixelID == "" {
+	
+	// Validate tracking ID
+	if err := utils.ValidateTrackingID(trackingPixelID); err != nil {
 		// Return transparent pixel anyway (don't reveal tracking failure)
 		c.Data(http.StatusOK, "image/gif", service.GetTrackingPixel())
 		return
@@ -41,6 +43,16 @@ func TrackClickHandler(c *gin.Context) {
 	trackingPixelID := c.Param("pixel_id")
 	linkID := c.Param("link_id")
 	encodedURL := c.Query("url")
+
+	// Validate tracking IDs
+	if err := utils.ValidateTrackingID(trackingPixelID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tracking pixel ID"})
+		return
+	}
+	if err := utils.ValidateTrackingID(linkID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid link ID"})
+		return
+	}
 
 	// Decode the original URL
 	urlBytes, err := base64.URLEncoding.DecodeString(encodedURL)

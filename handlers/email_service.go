@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -55,30 +55,43 @@ func ListEmailServicesHandler(c *gin.Context) {
 
 	// Parse filters from query parameters
 	var filters models.EmailServiceFilters
-	filters.Provider = c.Query("provider")
-	filters.Status = c.Query("status")
+
+	// Validate provider
+	if provider := c.Query("provider"); provider != "" {
+		if err := utils.ValidateProvider(provider); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		filters.Provider = provider
+	}
+
+	// Validate status
+	if status := c.Query("status"); status != "" {
+		if err := utils.ValidateStatus(status); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		filters.Status = status
+	}
 
 	// Parse project_id if provided
 	if projectIDStr := c.Query("project_id"); projectIDStr != "" {
 		projectID, err := uuid.Parse(projectIDStr)
-		if err == nil {
-			filters.ProjectID = &projectID
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
+			return
 		}
+		filters.ProjectID = &projectID
 	}
 
-	// Parse limit and offset
-	if limit := c.Query("limit"); limit != "" {
-		var l int
-		if _, err := fmt.Sscanf(limit, "%d", &l); err == nil {
-			filters.Limit = l
-		}
+	// Validate and parse pagination params
+	limit, offset, err := utils.ValidatePaginationParams(c.Query("limit"), c.Query("offset"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	if offset := c.Query("offset"); offset != "" {
-		var o int
-		if _, err := fmt.Sscanf(offset, "%d", &o); err == nil {
-			filters.Offset = o
-		}
-	}
+	filters.Limit = limit
+	filters.Offset = offset
 
 	services, err := emailServiceManager.ListEmailServices(userUUID, filters)
 	if err != nil {

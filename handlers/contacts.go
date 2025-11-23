@@ -3,11 +3,10 @@ package handlers
 import (
 	"encoding/csv"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -53,32 +52,40 @@ func GetContactHandler(c *gin.Context) {
 func ListContactsHandler(c *gin.Context) {
 	user := c.MustGet("user").(models.User)
 
-	// Parse query parameters
+	// Sanitize search query
 	search := c.Query("search")
-	tagsStr := c.Query("tags")
-	var tags []string
-	if tagsStr != "" {
-		tags = strings.Split(tagsStr, ",")
+	if search != "" {
+		sanitized, err := utils.SanitizeSearchQuery(search)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		search = sanitized
 	}
 
+	// Validate and parse tags
+	tags, err := utils.ValidateTagsList(c.Query("tags"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Parse subscribed boolean
 	var subscribed *bool
 	if subscribedStr := c.Query("subscribed"); subscribedStr != "" {
-		val := subscribedStr == "true"
+		val, err := utils.ValidateBooleanParam(subscribedStr, "subscribed")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		subscribed = &val
 	}
 
-	limit := 50
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil {
-			limit = parsedLimit
-		}
-	}
-
-	offset := 0
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil {
-			offset = parsedOffset
-		}
+	// Validate pagination params
+	limit, offset, err := utils.ValidatePaginationParams(c.Query("limit"), c.Query("offset"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	contacts, total, err := service.ListContacts(user.ID, search, tags, subscribed, limit, offset)

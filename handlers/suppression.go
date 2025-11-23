@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -65,19 +65,26 @@ func ListSuppressionsHandler(c *gin.Context) {
 	filters := models.SuppressionFilters{
 		Reason: c.Query("reason"),
 		Source: c.Query("source"),
-		Search: c.Query("search"),
 	}
 
-	if limit := c.Query("limit"); limit != "" {
-		if l, err := strconv.Atoi(limit); err == nil {
-			filters.Limit = l
+	// Sanitize search query
+	if search := c.Query("search"); search != "" {
+		sanitized, err := utils.SanitizeSearchQuery(search)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
+		filters.Search = sanitized
 	}
-	if offset := c.Query("offset"); offset != "" {
-		if o, err := strconv.Atoi(offset); err == nil {
-			filters.Offset = o
-		}
+
+	// Validate pagination params
+	limit, offset, err := utils.ValidatePaginationParams(c.Query("limit"), c.Query("offset"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
+	filters.Limit = limit
+	filters.Offset = offset
 
 	suppressionService := service.NewSuppressionService()
 	suppressions, total, err := suppressionService.ListSuppressions(userData.ID, filters)

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -12,6 +13,12 @@ import (
 // WebhookHandler processes email provider webhooks (SendGrid, Mailgun, etc.)
 func WebhookHandler(c *gin.Context) {
 	provider := c.Param("provider")
+
+	// Validate provider name
+	if err := utils.ValidateProvider(provider); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid provider"})
+		return
+	}
 
 	switch provider {
 	case "sendgrid":

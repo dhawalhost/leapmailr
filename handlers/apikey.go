@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/dhawalhost/leapmailr/models"
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -153,12 +153,14 @@ func GetAPIKeyUsageHandler(c *gin.Context) {
 		return
 	}
 
-	// Get limit from query params (default 100)
-	limit := 100
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if parsedLimit, err := strconv.Atoi(limitStr); err == nil {
-			limit = parsedLimit
-		}
+	// Validate limit from query params
+	limit, _, err := utils.ValidatePaginationParams(c.Query("limit"), "")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if limit == 50 {
+		limit = 100 // Default for this endpoint
 	}
 
 	logs, err := service.GetAPIKeyUsageStats(keyID, user.ID, limit)

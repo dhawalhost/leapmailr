@@ -79,6 +79,54 @@ func APIKeyPasswordField(label, placeholder, description string) SMTPProviderFie
 	}
 }
 
+// FixedUsernameField creates a username field with a fixed default value
+func FixedUsernameField(label, defaultValue, description string) SMTPProviderField {
+	return SMTPProviderField{
+		Key:         "username",
+		Label:       label,
+		Type:        "text",
+		Required:    true,
+		Placeholder: defaultValue,
+		Description: description,
+		Default:     defaultValue,
+	}
+}
+
+// APITokenUsernameField creates a username field for API tokens (password type)
+func APITokenUsernameField(label, description string) SMTPProviderField {
+	return SMTPProviderField{
+		Key:         "username",
+		Label:       label,
+		Type:        "password",
+		Required:    true,
+		Description: description,
+	}
+}
+
+// APITokenPasswordField creates a password field for API tokens
+func APITokenPasswordField(label, description string) SMTPProviderField {
+	return SMTPProviderField{
+		Key:         "password",
+		Label:       label,
+		Type:        "password",
+		Required:    true,
+		Description: description,
+	}
+}
+
+// RegionField creates a region field (for AWS SES)
+func RegionField(label, defaultValue, description string) SMTPProviderField {
+	return SMTPProviderField{
+		Key:         "region",
+		Label:       label,
+		Type:        "text",
+		Required:    true,
+		Placeholder: defaultValue,
+		Description: description,
+		Default:     defaultValue,
+	}
+}
+
 // TextFieldWithDefault creates a text field with a default value
 func TextFieldWithDefault(key, label, placeholder, description, defaultValue string) SMTPProviderField {
 	return SMTPProviderField{
