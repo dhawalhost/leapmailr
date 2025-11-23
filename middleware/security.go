@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -96,9 +97,20 @@ func RedirectToHTTPS(envMode string) gin.HandlerFunc {
 			return
 		}
 
-		// Redirect to HTTPS
-		httpsURL := "https://" + c.Request.Host + c.Request.RequestURI
-		c.Redirect(301, httpsURL) // 301 Permanent Redirect
+		// SECURITY: Safely construct HTTPS URL with validation
+		// Prevents open redirect attacks via Host header injection
+		httpsURL, err := utils.BuildSecureHTTPSURL(c.Request.Host, c.Request.RequestURI)
+		if err != nil {
+			// If URL construction fails, reject the request
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Invalid request headers",
+			})
+			c.Abort()
+			return
+		}
+
+		// Redirect to validated HTTPS URL
+		c.Redirect(http.StatusMovedPermanently, httpsURL) // 301 Permanent Redirect
 		c.Abort()
 	}
 }

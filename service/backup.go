@@ -10,6 +10,13 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	// Use absolute paths for PostgreSQL commands to prevent PATH injection attacks
+	// These are standard locations for PostgreSQL binaries on most systems
+	pgDumpPath    = "/usr/bin/pg_dump"
+	pgRestorePath = "/usr/bin/pg_restore"
+)
+
 // BackupService handles database backups and disaster recovery (GAP-AV-002)
 type BackupService struct {
 	logger        *zap.Logger
@@ -64,9 +71,9 @@ func (s *BackupService) CreateBackup() (string, error) {
 		zap.String("backup_file", backupPath),
 	)
 
-	// Create pg_dump command
+	// Create pg_dump command using absolute path for security
 	cmd := exec.Command(
-		"pg_dump",
+		pgDumpPath, // Use absolute path instead of relying on PATH
 		"-h", s.dbHost,
 		"-p", s.dbPort,
 		"-U", s.dbUser,
@@ -121,9 +128,9 @@ func (s *BackupService) VerifyBackup(backupPath string) error {
 		return fmt.Errorf("backup file too small: %d bytes", fileInfo.Size())
 	}
 
-	// Verify pg_restore can read the backup
+	// Verify pg_restore can read the backup using absolute path for security
 	cmd := exec.Command(
-		"pg_restore",
+		pgRestorePath, // Use absolute path instead of relying on PATH
 		"--list",
 		backupPath,
 	)
@@ -157,9 +164,9 @@ func (s *BackupService) RestoreBackup(backupPath string) error {
 		return fmt.Errorf("backup verification failed: %w", err)
 	}
 
-	// Create pg_restore command
+	// Create pg_restore command using absolute path for security
 	cmd := exec.Command(
-		"pg_restore",
+		pgRestorePath, // Use absolute path instead of relying on PATH
 		"-h", s.dbHost,
 		"-p", s.dbPort,
 		"-U", s.dbUser,

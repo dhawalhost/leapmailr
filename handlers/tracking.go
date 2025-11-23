@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/dhawalhost/leapmailr/service"
+	"github.com/dhawalhost/leapmailr/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -50,6 +51,15 @@ func TrackClickHandler(c *gin.Context) {
 
 	originalURL := string(urlBytes)
 
+	// Validate the URL before redirecting (SECURITY: Prevent open redirect attacks)
+	if err := utils.ValidateRedirectURL(originalURL); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid redirect URL",
+			"details": err.Error(),
+		})
+		return
+	}
+
 	// Get client info
 	ipAddress := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
@@ -60,7 +70,7 @@ func TrackClickHandler(c *gin.Context) {
 		trackingService.RecordClick(trackingPixelID, linkID, originalURL, ipAddress, userAgent)
 	}()
 
-	// Redirect to original URL
+	// Redirect to validated URL
 	c.Redirect(http.StatusFound, originalURL)
 }
 

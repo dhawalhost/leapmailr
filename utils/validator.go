@@ -2,7 +2,9 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"net/mail"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -249,4 +251,174 @@ func GetBaseURL() string {
 	}
 
 	return "http://localhost:" + port
+}
+
+// ValidateRedirectURL validates that a URL is safe to redirect to
+// Prevents open redirect vulnerabilities
+func ValidateRedirectURL(urlStr string) error {
+	if urlStr == "" {
+		return errors.New("URL is required")
+	}
+
+	// Check URL length
+	if len(urlStr) > 2048 {
+		return errors.New("URL too long")
+	}
+
+	// Parse URL
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return errors.New("invalid URL format")
+	}
+
+	// Must have a scheme (http or https)
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return errors.New("URL must use http or https protocol")
+	}
+
+	// Must have a host
+	if parsedURL.Host == "" {
+		return errors.New("URL must have a valid host")
+	}
+
+	// Prevent localhost/internal redirects (security measure)
+	host := strings.ToLower(parsedURL.Hostname())
+	if host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0" ||
+		strings.HasPrefix(host, "192.168.") ||
+		strings.HasPrefix(host, "10.") ||
+		strings.HasPrefix(host, "172.16.") ||
+		host == "::1" {
+		return errors.New("redirects to internal/local addresses are not allowed")
+	}
+
+	// Prevent javascript: data: and other dangerous schemes
+	if strings.Contains(strings.ToLower(urlStr), "javascript:") ||
+		strings.Contains(strings.ToLower(urlStr), "data:") ||
+		strings.Contains(strings.ToLower(urlStr), "vbscript:") {
+		return errors.New("URL contains dangerous content")
+	}
+
+	return nil
+}
+
+// IsAllowedDomain checks if a domain is in the allowed list
+// This should be configured based on your application's needs
+func IsAllowedDomain(urlStr string, allowedDomains []string) (bool, error) {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return false, err
+	}
+
+	host := strings.ToLower(parsedURL.Hostname())
+
+	// If no allowed domains specified, use validation only
+	if len(allowedDomains) == 0 {
+		return true, nil
+	}
+
+	// Check if domain matches any allowed domain
+	for _, allowed := range allowedDomains {
+		allowed = strings.ToLower(strings.TrimSpace(allowed))
+		if host == allowed || strings.HasSuffix(host, "."+allowed) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// SanitizeHostHeader validates and sanitizes the Host header
+// Prevents host header injection attacks
+func SanitizeHostHeader(host string) (string, error) {
+	if host == "" {
+		return "", errors.New("empty host header")
+	}
+
+	// Remove port if present for validation
+	hostname := host
+	if idx := strings.LastIndex(host, ":"); idx != -1 {
+		hostname = host[:idx]
+	}
+
+	// Validate hostname format
+	// Must be valid domain or IP address
+	if hostname == "" {
+		return "", errors.New("invalid host header")
+	}
+
+	// Block localhost and internal addresses
+	lower := strings.ToLower(hostname)
+	if lower == "localhost" || lower == "127.0.0.1" || lower == "0.0.0.0" ||
+		strings.HasPrefix(lower, "192.168.") ||
+		strings.HasPrefix(lower, "10.") ||
+		strings.HasPrefix(lower, "172.16.") ||
+		lower == "::1" {
+		return "", errors.New("localhost and internal addresses not allowed")
+	}
+
+	// Basic validation: only allow alphanumeric, dots, hyphens, and colons (for port)
+	validHost := regexp.MustCompile(`^[a-zA-Z0-9\.\-:]+$`)
+	if !validHost.MatchString(host) {
+		return "", errors.New("invalid characters in host header")
+	}
+
+	return host, nil
+}
+
+// SanitizeRequestURI validates and sanitizes the request URI
+// Prevents URI injection attacks
+func SanitizeRequestURI(uri string) (string, error) {
+	if uri == "" {
+		uri = "/"
+	}
+
+	// URI must start with /
+	if !strings.HasPrefix(uri, "/") {
+		return "", errors.New("invalid URI format")
+	}
+
+	// Prevent absolute URLs in URI (which would be an open redirect)
+	if strings.Contains(uri, "://") {
+		return "", errors.New("absolute URLs not allowed in URI")
+	}
+
+	// Check for suspicious patterns
+	lower := strings.ToLower(uri)
+	if strings.Contains(lower, "javascript:") ||
+		strings.Contains(lower, "data:") ||
+		strings.Contains(lower, "vbscript:") {
+		return "", errors.New("dangerous content in URI")
+	}
+
+	// Limit length
+	if len(uri) > 2048 {
+		return "", errors.New("URI too long")
+	}
+
+	return uri, nil
+}
+
+// BuildSecureHTTPSURL safely constructs an HTTPS URL from validated components
+func BuildSecureHTTPSURL(host, uri string) (string, error) {
+	// Validate and sanitize host
+	cleanHost, err := SanitizeHostHeader(host)
+	if err != nil {
+		return "", fmt.Errorf("invalid host: %w", err)
+	}
+
+	// Validate and sanitize URI
+	cleanURI, err := SanitizeRequestURI(uri)
+	if err != nil {
+		return "", fmt.Errorf("invalid URI: %w", err)
+	}
+
+	// Build the URL
+	httpsURL := "https://" + cleanHost + cleanURI
+
+	// Final validation
+	if err := ValidateRedirectURL(httpsURL); err != nil {
+		return "", fmt.Errorf("constructed URL failed validation: %w", err)
+	}
+
+	return httpsURL, nil
 }
