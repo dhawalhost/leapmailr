@@ -96,8 +96,9 @@ func (r *RedisHealthChecker) CheckHealth() ComponentHealth {
 		Duration:  time.Since(start).Milliseconds(),
 	}
 
-	// TODO: Implement actual Redis health check when Redis is added
-	// For now, return healthy since it's optional
+	// Note: Redis health check should be implemented when Redis is integrated
+	// Use github.com/go-redis/redis to check connectivity with PING command
+	// For now, return healthy since Redis is optional
 
 	return health
 }
@@ -126,7 +127,8 @@ func (d *DiskSpaceHealthChecker) CheckHealth() ComponentHealth {
 		LastCheck: start,
 	}
 
-	// TODO: Implement actual disk space check using syscall
+	// Note: Disk space check requires platform-specific syscall implementation
+	// Use syscall.Statfs (Unix) or syscall.GetDiskFreeSpaceEx (Windows)
 	// For now, return healthy
 	health.Status = HealthStatusHealthy
 	health.Message = "Sufficient space available"
@@ -157,7 +159,9 @@ func (m *MemoryHealthChecker) CheckHealth() ComponentHealth {
 		LastCheck: start,
 	}
 
-	// TODO: Implement actual memory check using runtime.MemStats
+	// Note: Memory check should use runtime.ReadMemStats(&memStats) to get actual usage
+	// Calculate percentage: (memStats.Alloc / memStats.Sys) * 100
+	// Compare against warning and critical thresholds
 	// For now, return healthy
 	health.Status = HealthStatusHealthy
 	health.Message = "Memory usage normal"

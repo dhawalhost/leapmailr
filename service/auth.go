@@ -648,15 +648,8 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword,
 	}
 
 	// Verify old password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
-		// Log failed password change attempt
-		auditService := NewAuditService()
-		details := &AuditEventDetails{
-			Email:  user.Email,
-			Reason: "invalid old password",
-		}
-		_ = auditService.LogEvent(&userID, "password_change_failed", "user", &userID, "failure", ipAddress, userAgent, details)
-		return fmt.Errorf("invalid old password")
+	if err := s.verifyOldPassword(&user, oldPassword, ipAddress, userAgent); err != nil {
+		return err
 	}
 
 	// Validate new password strength (GAP-SEC-002)
@@ -664,7 +657,60 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword,
 		return fmt.Errorf("weak password: %w", err)
 	}
 
-	// Check password history - prevent reuse of last 5 passwords (GAP-SEC-002)
+	// Check password history
+	if err := s.checkPasswordHistory(userID, &user, newPassword, ipAddress, userAgent); err != nil {
+		return err
+	}
+
+	// Hash and update password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	user.PasswordHash = string(hashedPassword)
+	if err := s.db.Save(&user).Error; err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// Update password history
+	s.updatePasswordHistory(userID, &user, hashedPassword)
+
+	// Revoke all existing tokens to force re-login
+	if err := s.revokeUserTokens(userID); err != nil {
+		fmt.Printf("Warning: Failed to revoke tokens for user %s: %v\n", user.Email, err)
+	}
+
+	// Log successful password change
+	auditService := NewAuditService()
+	_ = auditService.LogPasswordChange(userID, ipAddress, userAgent)
+
+	return nil
+}
+
+func (s *AuthService) verifyOldPassword(user *models.User, oldPassword, ipAddress, userAgent string) error {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
+		auditService := NewAuditService()
+		details := &AuditEventDetails{
+			Email:  user.Email,
+			Reason: "invalid old password",
+		}
+		_ = auditService.LogEvent(&AuditEventParams{
+			UserID:     &user.ID,
+			Action:     "password_change_failed",
+			Resource:   "user",
+			ResourceID: &user.ID,
+			Status:     "failure",
+			IPAddress:  ipAddress,
+			UserAgent:  userAgent,
+			Details:    details,
+		})
+		return fmt.Errorf("invalid old password")
+	}
+	return nil
+}
+
+func (s *AuthService) checkPasswordHistory(userID uuid.UUID, user *models.User, newPassword, ipAddress, userAgent string) error {
 	const maxPasswordHistory = 5
 	var passwordHistory []models.PasswordHistory
 	if err := s.db.Where(queryUserID, userID).
@@ -677,28 +723,29 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword,
 	// Check if new password matches any recent password
 	for _, ph := range passwordHistory {
 		if err := bcrypt.CompareHashAndPassword([]byte(ph.PasswordHash), []byte(newPassword)); err == nil {
-			// Log failed password change attempt
 			auditService := NewAuditService()
 			details := &AuditEventDetails{
 				Email:  user.Email,
 				Reason: "password reuse detected (matches password from history)",
 			}
-			_ = auditService.LogEvent(&userID, "password_change_failed", "user", &userID, "failure", ipAddress, userAgent, details)
+			_ = auditService.LogEvent(&AuditEventParams{
+				UserID:     &userID,
+				Action:     "password_change_failed",
+				Resource:   "user",
+				ResourceID: &userID,
+				Status:     "failure",
+				IPAddress:  ipAddress,
+				UserAgent:  userAgent,
+				Details:    details,
+			})
 			return fmt.Errorf("cannot reuse recent passwords. Please choose a different password")
 		}
 	}
+	return nil
+}
 
-	// Hash new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-
-	// Update user password
-	user.PasswordHash = string(hashedPassword)
-	if err := s.db.Save(&user).Error; err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
-	}
+func (s *AuthService) updatePasswordHistory(userID uuid.UUID, user *models.User, hashedPassword []byte) {
+	const maxPasswordHistory = 5
 
 	// Add new password to history
 	newHistory := models.PasswordHistory{
@@ -706,7 +753,6 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword,
 		PasswordHash: string(hashedPassword),
 	}
 	if err := s.db.Create(&newHistory).Error; err != nil {
-		// Log warning but don't fail the password change
 		fmt.Printf("Warning: Failed to create password history for user %s: %v\n", user.Email, err)
 	}
 
@@ -725,15 +771,4 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword,
 			s.db.Where("id IN ?", oldHistoryIDs).Delete(&models.PasswordHistory{})
 		}
 	}
-
-	// Revoke all existing tokens to force re-login
-	if err := s.revokeUserTokens(userID); err != nil {
-		fmt.Printf("Warning: Failed to revoke tokens for user %s: %v\n", user.Email, err)
-	}
-
-	// Log successful password change
-	auditService := NewAuditService()
-	_ = auditService.LogPasswordChange(userID, ipAddress, userAgent)
-
-	return nil
 }

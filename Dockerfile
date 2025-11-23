@@ -1,8 +1,8 @@
 # Multi-stage build for LeapMailr Backend
 FROM golang:1.23-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+# Install build dependencies (sorted alphanumerically)
+RUN apk add --no-cache ca-certificates git tzdata
 
 # Set working directory
 WORKDIR /app
@@ -22,11 +22,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o leapmailr .
 # Final stage - minimal runtime image
 FROM alpine:latest
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
-
-# Create non-root user
-RUN addgroup -g 1000 leapmailr && \
+# Install runtime dependencies and create non-root user
+RUN apk --no-cache add ca-certificates tzdata && \
+    addgroup -g 1000 leapmailr && \
     adduser -D -u 1000 -G leapmailr leapmailr
 
 # Set working directory

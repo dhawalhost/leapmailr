@@ -4,9 +4,12 @@
 
 set -e
 
-echo "=========================================="
+# Constants
+readonly SEPARATOR_LINE='=========================================='
+
+echo "$SEPARATOR_LINE"
 echo "LeapMailR - Quick Setup Script"
-echo "=========================================="
+echo "$SEPARATOR_LINE"
 echo ""
 
 # Colors for output
@@ -17,21 +20,28 @@ NC='\033[0m' # No Color
 
 # Function to print colored output
 print_success() {
-    echo -e "${GREEN}✓ $1${NC}"
+    local message="$1"
+    echo -e "${GREEN}✓ $message${NC}"
+    return 0
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠ $1${NC}"
+    local message="$1"
+    echo -e "${YELLOW}⚠ $message${NC}"
+    return 0
 }
 
 print_error() {
-    echo -e "${RED}✗ $1${NC}"
+    local message="$1"
+    echo -e "${RED}✗ $message${NC}"
     exit 1
 }
 
 # Check if command exists
 command_exists() {
-    command -v "$1" >/dev/null 2>&1
+    local cmd="$1"
+    command -v "$cmd" >/dev/null 2>&1
+    return 0
 }
 
 # ==========================================

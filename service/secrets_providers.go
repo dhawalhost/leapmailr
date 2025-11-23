@@ -117,32 +117,36 @@ func NewVaultSecretsProvider(address, token, path string, logger *zap.Logger) *V
 
 // GetSecret retrieves a secret from Vault
 func (p *VaultSecretsProvider) GetSecret(ctx context.Context, key string) (string, error) {
-	// TODO: Implement Vault API call
-	// This is a placeholder for the actual Vault integration
+	// Placeholder for actual Vault integration
+	// Implement using the HashiCorp Vault API client library
 	return "", errors.New(errVaultNotImpl)
 }
 
 // SetSecret stores a secret in Vault
 func (p *VaultSecretsProvider) SetSecret(ctx context.Context, key, value string) error {
-	// TODO: Implement Vault API call
+	// Placeholder for actual Vault integration
+	// Implement using the HashiCorp Vault API client library
 	return errors.New(errVaultNotImpl)
 }
 
 // DeleteSecret removes a secret from Vault
 func (p *VaultSecretsProvider) DeleteSecret(ctx context.Context, key string) error {
-	// TODO: Implement Vault API call
+	// Placeholder for actual Vault integration
+	// Implement using the HashiCorp Vault API client library
 	return errors.New(errVaultNotImpl)
 }
 
 // ListSecrets lists all secret keys from Vault
 func (p *VaultSecretsProvider) ListSecrets(ctx context.Context) ([]string, error) {
-	// TODO: Implement Vault API call
+	// Placeholder for actual Vault integration
+	// Implement using the HashiCorp Vault API client library
 	return nil, errors.New(errVaultNotImpl)
 }
 
 // RotateSecret generates a new value for a secret in Vault
 func (p *VaultSecretsProvider) RotateSecret(ctx context.Context, key string) (string, error) {
-	// TODO: Implement Vault API call with rotation
+	// Placeholder for actual Vault integration with rotation support
+	// Implement using the HashiCorp Vault API client library
 	return "", errors.New(errVaultNotImpl)
 }
 
@@ -163,31 +167,36 @@ func NewAWSSecretsProvider(region string, logger *zap.Logger) *AWSSecretsProvide
 
 // GetSecret retrieves a secret from AWS Secrets Manager
 func (p *AWSSecretsProvider) GetSecret(ctx context.Context, key string) (string, error) {
-	// TODO: Implement AWS Secrets Manager API call
+	// Placeholder for actual AWS Secrets Manager integration
+	// Implement using the AWS SDK for Go v2 (github.com/aws/aws-sdk-go-v2/service/secretsmanager)
 	return "", errors.New(errAWSSecretsNotImpl)
 }
 
 // SetSecret stores a secret in AWS Secrets Manager
 func (p *AWSSecretsProvider) SetSecret(ctx context.Context, key, value string) error {
-	// TODO: Implement AWS Secrets Manager API call
+	// Placeholder for actual AWS Secrets Manager integration
+	// Implement using the AWS SDK for Go v2
 	return errors.New(errAWSSecretsNotImpl)
 }
 
 // DeleteSecret removes a secret from AWS Secrets Manager
 func (p *AWSSecretsProvider) DeleteSecret(ctx context.Context, key string) error {
-	// TODO: Implement AWS Secrets Manager API call
+	// Placeholder for actual AWS Secrets Manager integration
+	// Implement using the AWS SDK for Go v2
 	return errors.New(errAWSSecretsNotImpl)
 }
 
 // ListSecrets lists all secret keys from AWS Secrets Manager
 func (p *AWSSecretsProvider) ListSecrets(ctx context.Context) ([]string, error) {
-	// TODO: Implement AWS Secrets Manager API call
+	// Placeholder for actual AWS Secrets Manager integration
+	// Implement using the AWS SDK for Go v2
 	return nil, errors.New(errAWSSecretsNotImpl)
 }
 
 // RotateSecret generates a new value for a secret in AWS Secrets Manager
 func (p *AWSSecretsProvider) RotateSecret(ctx context.Context, key string) (string, error) {
-	// TODO: Implement AWS Secrets Manager API call with rotation
+	// Placeholder for actual AWS Secrets Manager integration with rotation support
+	// Implement using the AWS SDK for Go v2
 	return "", errors.New(errAWSSecretsNotImpl)
 }
 

@@ -4,6 +4,10 @@
 
 set -e  # Exit on error
 
+# Constants
+readonly DATE_FORMAT='%Y-%m-%d %H:%M:%S'
+readonly SEPARATOR_LINE='=========================================='
+
 # Configuration
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 DB_HOST="${DB_HOST:-localhost}"
@@ -19,16 +23,19 @@ mkdir -p "$(dirname "$LOG_FILE")"
 
 # Logging function
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    local message="$1"
+    echo "[$(date +"$DATE_FORMAT")] $message" | tee -a "$LOG_FILE"
+    return 0
 }
 
 # Error handler
 error_exit() {
-    log "ERROR: $1"
+    local message="$1"
+    log "ERROR: $message"
     exit 1
 }
 
-log "=========================================="
+log "$SEPARATOR_LINE"
 log "Starting automated backup process"
 log "Database: $DB_NAME"
 log "Host: $DB_HOST:$DB_PORT"

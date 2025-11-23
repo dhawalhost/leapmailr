@@ -13,6 +13,10 @@
 #   - PostgreSQL client tools (pg_dump)
 #   - AWS CLI configured with credentials
 #   - S3 bucket created for backups
+
+# Constants
+readonly DATE_FORMAT='%Y-%m-%d %H:%M:%S'
+readonly SEPARATOR_LINE='========================================='
 #   - Proper permissions on backup directory
 #
 # Setup:
@@ -78,22 +82,30 @@ LOG_FILE="/var/log/leapmailr-backup_${DATE_ONLY}.log"
 
 # Function to log messages
 log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    local message="$1"
+    echo "[$(date +"$DATE_FORMAT")] $message" | tee -a "$LOG_FILE"
+    return 0
 }
 
 # Function to log errors
 log_error() {
-    echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}" | tee -a "$LOG_FILE"
+    local message="$1"
+    echo -e "${RED}[$(date +"$DATE_FORMAT")] ERROR: $message${NC}" | tee -a "$LOG_FILE" >&2
+    return 0
 }
 
 # Function to log success
 log_success() {
-    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] SUCCESS: $1${NC}" | tee -a "$LOG_FILE"
+    local message="$1"
+    echo -e "${GREEN}[$(date +"$DATE_FORMAT")] SUCCESS: $message${NC}" | tee -a "$LOG_FILE"
+    return 0
 }
 
 # Function to log warnings
 log_warning() {
-    echo -e "${YELLOW}[$(date +'%Y-%m-%d %H:%M:%S')] WARNING: $1${NC}" | tee -a "$LOG_FILE"
+    local message="$1"
+    echo -e "${YELLOW}[$(date +"$DATE_FORMAT")] WARNING: $message${NC}" | tee -a "$LOG_FILE"
+    return 0
 }
 
 # Function to send email alert
@@ -106,6 +118,7 @@ send_email() {
     else
         log_warning "mail command not found. Cannot send email alert."
     fi
+    return 0
 }
 
 # Function to cleanup on error
@@ -113,6 +126,9 @@ cleanup_on_error() {
     log_error "Backup failed. Cleaning up..."
     if [[ -f "$BACKUP_FILE" ]]; then
         rm -f "$BACKUP_FILE"
+    fi
+    return 0
+}
         log "Removed incomplete backup file: $BACKUP_FILE"
     fi
     
@@ -136,9 +152,9 @@ trap cleanup_on_error ERR
 # ========== MAIN BACKUP PROCESS ==========
 #
 
-log "========================================="
+log "$SEPARATOR_LINE"
 log "Starting Leapmailr Database Backup"
-log "========================================="
+log "$SEPARATOR_LINE"
 log "Database: $DB_NAME"
 log "Backup file: $BACKUP_FILE"
 log "S3 destination: $S3_BUCKET/"
@@ -295,9 +311,9 @@ log_success "S3 cleanup completed"
 # This could be implemented in the future to track backups in the application
 
 # Final summary
-log "========================================="
+log "$SEPARATOR_LINE"
 log_success "BACKUP COMPLETED SUCCESSFULLY"
-log "========================================="
+log "$SEPARATOR_LINE"
 log "Summary:"
 log "  - Database: $DB_NAME"
 log "  - Backup file: $BACKUP_FILENAME"
@@ -305,7 +321,7 @@ log "  - Size: $BACKUP_SIZE"
 log "  - Duration: ${DURATION} seconds"
 log "  - S3 location: $S3_BUCKET/$BACKUP_FILENAME"
 log "  - Checksum: $CHECKSUM"
-log "========================================="
+log "$SEPARATOR_LINE"
 
 # Send success email if configured
 if [[ "$SEND_SUCCESS_EMAIL" = "true" ]]; then

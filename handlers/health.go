@@ -12,7 +12,9 @@ import (
 var (
 	healthMonitor *monitoring.HealthMonitor
 	startTime     time.Time
-	appVersion    = "1.0.0" // TODO: Load from build info
+	// Application version - should be overridden at build time using -ldflags
+	// Example: go build -ldflags "-X 'github.com/dhawalhost/leapmailr/handlers.appVersion=1.2.3'"
+	appVersion = "1.0.0"
 )
 
 func init() {

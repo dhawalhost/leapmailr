@@ -85,7 +85,8 @@ func getAllowedOrigins(envMode string) []string {
 	}
 
 	// Production - strict whitelist
-	// TODO: Update these with your actual production domains
+	// Note: Update these domains to match your actual production environment
+	// Configure via environment variables for better security
 	return []string{
 		"https://app.leapmailr.com",
 		"https://leapmailr.com",

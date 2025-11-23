@@ -4,6 +4,9 @@
 
 set -e
 
+# Constants
+readonly DATE_FORMAT='%Y-%m-%d %H:%M:%S'
+
 # Configuration
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
@@ -16,12 +19,15 @@ mkdir -p "$(dirname "$LOG_FILE")"
 
 # Logging function
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    local message="$1"
+    echo "[$(date +"$DATE_FORMAT")] $message" | tee -a "$LOG_FILE"
+    return 0
 }
 
 # Error handler
 error_exit() {
-    log "ERROR: $1"
+    local message="$1"
+    log "ERROR: $message"
     exit 1
 }
 

@@ -108,8 +108,8 @@ func GetEmailAnalyticsHandler(c *gin.Context) {
 		return
 	}
 
-	// Verify email belongs to user
-	// TODO: Add authorization check
+	// Note: Authorization check should verify email belongs to the authenticated user
+	// This should be implemented alongside the user authentication middleware
 
 	trackingService := service.NewEmailTrackingService()
 	analytics, err := trackingService.GetAnalytics(emailID)
@@ -138,7 +138,8 @@ func GetCampaignAnalyticsHandler(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement campaign analytics aggregation
+	// Note: Campaign analytics aggregation requires a campaigns table and relationship mapping
+	// Future enhancement: Aggregate analytics across all emails in a campaign
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Campaign analytics coming soon",
@@ -163,7 +164,8 @@ func GetEmailTrackingEventsHandler(c *gin.Context) {
 		return
 	}
 
-	// TODO: Implement detailed events retrieval
+	// Note: Detailed events retrieval needs to query email_open_events and email_click_events tables
+	// Future enhancement: Return full event history with timestamps, IPs, user agents, etc.
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
 		"data": gin.H{

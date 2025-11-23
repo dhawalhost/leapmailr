@@ -4,6 +4,10 @@
 
 set -e
 
+# Constants
+readonly DATE_FORMAT='%Y-%m-%d %H:%M:%S'
+readonly SEPARATOR_LINE='=========================================='
+
 # Configuration
 SECRETS_DIR="${SECRETS_DIR:-./secrets}"
 BACKUP_DIR="${BACKUP_DIR:-./secrets/backups}"
@@ -17,18 +21,21 @@ mkdir -p "$(dirname "$LOG_FILE")"
 
 # Logging function
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    local message="$1"
+    echo "[$(date +"$DATE_FORMAT")] $message" | tee -a "$LOG_FILE"
+    return 0
 }
 
 # Error handler
 error_exit() {
-    log "ERROR: $1"
+    local message="$1"
+    log "ERROR: $message"
     exit 1
 }
 
-log "=========================================="
+log "$SEPARATOR_LINE"
 log "SECRET ROTATION STARTED"
-log "=========================================="
+log "$SEPARATOR_LINE"
 
 # Check if running in production
 if [[ "$ENVIRONMENT" = "production" ]]; then
@@ -43,18 +50,21 @@ fi
 generate_secret() {
     local length="${1:-32}"
     openssl rand -base64 "$length" | tr -d "=+/" | cut -c1-"$length"
+    return 0
 }
 
 # Function to backup current secret
 backup_secret() {
     local key="$1"
     local value="$2"
-    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_file="$BACKUP_DIR/${key}_${timestamp}.bak"
     
     echo "$value" > "$backup_file"
     chmod 600 "$backup_file"
     log "Backed up $key to $backup_file"
+    return 0
 }
 
 # Function to rotate JWT secret
@@ -62,79 +72,90 @@ rotate_jwt_secret() {
     log "Rotating JWT_SECRET..."
     
     # Get current secret
-    CURRENT_JWT=$(grep "^JWT_SECRET=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
+    local current_jwt
+    current_jwt=$(grep "^JWT_SECRET=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
     
-    if [[ -n "$CURRENT_JWT" ]]; then
-        backup_secret "JWT_SECRET" "$CURRENT_JWT"
+    if [[ -n "$current_jwt" ]]; then
+        backup_secret "JWT_SECRET" "$current_jwt"
     fi
     
     # Generate new secret (64 bytes for HMAC-SHA256)
-    NEW_JWT=$(generate_secret 64)
+    local new_jwt
+    new_jwt=$(generate_secret 64)
     
     # Update .env file
     if grep -q "^JWT_SECRET=" "$ENV_FILE"; then
-        sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$NEW_JWT|" "$ENV_FILE"
+        sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$new_jwt|" "$ENV_FILE"
     else
-        echo "JWT_SECRET=$NEW_JWT" >> "$ENV_FILE"
+        echo "JWT_SECRET=$new_jwt" >> "$ENV_FILE"
     fi
     
     log "JWT_SECRET rotated successfully"
+    return 0
 }
 
 # Function to rotate encryption key
 rotate_encryption_key() {
     log "Rotating ENCRYPTION_KEY..."
     
-    CURRENT_KEY=$(grep "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
+    local current_key
+    current_key=$(grep "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
     
-    if [[ -n "$CURRENT_KEY" ]]; then
-        backup_secret "ENCRYPTION_KEY" "$CURRENT_KEY"
+    if [[ -n "$current_key" ]]; then
+        backup_secret "ENCRYPTION_KEY" "$current_key"
     fi
     
     # Generate new 32-byte key, base64 encoded
-    NEW_KEY=$(openssl rand -base64 32)
+    local new_key
+    new_key=$(openssl rand -base64 32)
     
     if grep -q "^ENCRYPTION_KEY=" "$ENV_FILE"; then
-        sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$NEW_KEY|" "$ENV_FILE"
+        sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$new_key|" "$ENV_FILE"
     else
-        echo "ENCRYPTION_KEY=$NEW_KEY" >> "$ENV_FILE"
+        echo "ENCRYPTION_KEY=$new_key" >> "$ENV_FILE"
     fi
     
     log "ENCRYPTION_KEY rotated successfully"
     log "WARNING: You must re-encrypt existing encrypted data with the new key"
+    return 0
 }
 
 # Function to rotate database password
 rotate_db_password() {
     log "Rotating database password..."
     
-    CURRENT_PASS=$(grep "^DB_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
+    local current_pass
+    current_pass=$(grep "^DB_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
     
-    if [[ -n "$CURRENT_PASS" ]]; then
-        backup_secret "DB_PASSWORD" "$CURRENT_PASS"
+    if [[ -n "$current_pass" ]]; then
+        backup_secret "DB_PASSWORD" "$current_pass"
     fi
     
     # Generate new password (24 characters with special chars)
-    NEW_PASS=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-24)
+    local new_pass
+    new_pass=$(openssl rand -base64 24 | tr -d "=+/" | cut -c1-24)
     
     # Update .env file
     if grep -q "^DB_PASSWORD=" "$ENV_FILE"; then
-        sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$NEW_PASS|" "$ENV_FILE"
+        sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$new_pass|" "$ENV_FILE"
     else
-        echo "DB_PASSWORD=$NEW_PASS" >> "$ENV_FILE"
+        echo "DB_PASSWORD=$new_pass" >> "$ENV_FILE"
     fi
     
     # Update PostgreSQL password
-    DB_USER=$(grep "^DB_USER=" "$ENV_FILE" | cut -d'=' -f2- || echo "postgres")
-    log "Updating PostgreSQL password for user: $DB_USER"
+    local db_user
+    db_user=$(grep "^DB_USER=" "$ENV_FILE" | cut -d'=' -f2- || echo "postgres")
+    log "Updating PostgreSQL password for user: $db_user"
     
     # Connect to PostgreSQL and update password
-    export PGPASSWORD="$CURRENT_PASS"
-    psql -h "${DB_HOST:-localhost}" -U "$DB_USER" -d postgres -c \
-        "ALTER USER $DB_USER WITH PASSWORD '$NEW_PASS';" || \
+    PGPASSWORD="$current_pass"
+    export PGPASSWORD
+    psql -h "${DB_HOST:-localhost}" -U "$db_user" -d postgres -c \
+        "ALTER USER $db_user WITH PASSWORD '$new_pass';" || \
         error_exit "Failed to update database password"
     
     log "DB_PASSWORD rotated successfully"
+    return 0
 }
 
 # Function to rotate SMTP password
@@ -142,6 +163,7 @@ rotate_smtp_password() {
     log "Rotating SMTP password..."
     log "NOTE: SMTP passwords must be rotated through your email provider's control panel"
     log "After rotating with your provider, update the .env file manually"
+    return 0
 }
 
 # Function to rotate API keys
@@ -159,6 +181,7 @@ rotate_api_keys() {
         log "NOTE: SendGrid API key should be rotated through SendGrid Dashboard"
         log "After rotation, update SENDGRID_API_KEY in .env"
     fi
+    return 0
 }
 
 # Function to rotate Redis password (if using Redis)
@@ -166,23 +189,26 @@ rotate_redis_password() {
     if grep -q "^REDIS_PASSWORD=" "$ENV_FILE"; then
         log "Rotating Redis password..."
         
-        CURRENT_REDIS=$(grep "^REDIS_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
+        local current_redis
+        current_redis=$(grep "^REDIS_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2- || echo "")
         
-        if [[ -n "$CURRENT_REDIS" ]]; then
-            backup_secret "REDIS_PASSWORD" "$CURRENT_REDIS"
+        if [[ -n "$current_redis" ]]; then
+            backup_secret "REDIS_PASSWORD" "$current_redis"
         fi
         
-        NEW_REDIS=$(generate_secret 32)
+        local new_redis
+        new_redis=$(generate_secret 32)
         
         if grep -q "^REDIS_PASSWORD=" "$ENV_FILE"; then
-            sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=$NEW_REDIS|" "$ENV_FILE"
+            sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=$new_redis|" "$ENV_FILE"
         else
-            echo "REDIS_PASSWORD=$NEW_REDIS" >> "$ENV_FILE"
+            echo "REDIS_PASSWORD=$new_redis" >> "$ENV_FILE"
         fi
         
         log "REDIS_PASSWORD rotated successfully"
         log "NOTE: Update Redis configuration and restart Redis server"
     fi
+    return 0
 }
 
 # Main rotation logic

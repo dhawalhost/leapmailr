@@ -285,13 +285,22 @@ func (s *EmailTrackingService) GetAnalytics(emailLogID uuid.UUID) (*models.Email
 	}
 
 	// Calculate click stats
-	totalClicks := len(tracking.ClickEvents)
+	s.calculateClickStats(analytics, tracking.ClickEvents)
+
+	// Device and client breakdown
+	s.calculateDeviceBreakdown(analytics, tracking.OpenEvents)
+
+	return analytics, nil
+}
+
+func (s *EmailTrackingService) calculateClickStats(analytics *models.EmailTrackingAnalytics, clickEvents []models.EmailClickEvent) {
+	totalClicks := len(clickEvents)
 	uniqueClicks := make(map[string]bool)
 	linkStats := make(map[string]*models.LinkStats)
 
 	var firstClickedAt, lastClickedAt *time.Time
 
-	for _, click := range tracking.ClickEvents {
+	for _, click := range clickEvents {
 		// Track first and last click
 		if firstClickedAt == nil || click.ClickedAt.Before(*firstClickedAt) {
 			firstClickedAt = &click.ClickedAt
@@ -327,9 +336,10 @@ func (s *EmailTrackingService) GetAnalytics(emailLogID uuid.UUID) (*models.Email
 		analytics.ClickRate = float64(analytics.UniqueClicks) / float64(analytics.UniqueOpens) * 100.0
 		analytics.ClickToOpenRate = float64(analytics.UniqueClicks) / float64(analytics.UniqueOpens) * 100.0
 	}
+}
 
-	// Device and client breakdown
-	for _, open := range tracking.OpenEvents {
+func (s *EmailTrackingService) calculateDeviceBreakdown(analytics *models.EmailTrackingAnalytics, openEvents []models.EmailOpenEvent) {
+	for _, open := range openEvents {
 		if open.Device != "" {
 			analytics.DeviceBreakdown[open.Device]++
 		}
@@ -337,13 +347,6 @@ func (s *EmailTrackingService) GetAnalytics(emailLogID uuid.UUID) (*models.Email
 			analytics.ClientBreakdown[open.EmailClient]++
 		}
 	}
-
-	// Convert link stats map to slice
-	for _, stats := range linkStats {
-		analytics.TopLinks = append(analytics.TopLinks, *stats)
-	}
-
-	return analytics, nil
 }
 
 // Helper functions

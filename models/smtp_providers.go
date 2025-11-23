@@ -53,9 +53,9 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://docs.sendgrid.com/for-developers/sending-email/integrating-with-the-smtp-api",
 			Logo:         "/providers/sendgrid.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from (must be verified in SendGrid)"),
+				FromEmailField(DefaultFromEmail, "The email address to send from (must be verified in SendGrid)"),
 				FixedUsernameField("API Username", "apikey", "Use 'apikey' as the username"),
-				APIKeyPasswordField("API Key", "SG.xxxxxxxxxxxxx", "Your SendGrid API Key"),
+				APIKeyPasswordField(LabelAPIKey, "SG.xxxxxxxxxxxxx", "Your SendGrid API Key"),
 			},
 		},
 		{
@@ -89,7 +89,7 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://postmarkapp.com/developer/user-guide/send-email-with-smtp",
 			Logo:         "/providers/postmark.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from (must be verified in Postmark)"),
+				FromEmailField(DefaultFromEmail, "The email address to send from (must be verified in Postmark)"),
 				APITokenUsernameField("Server API Token", "Use your Server API Token as both username and password"),
 				APITokenPasswordField("Server API Token (repeat)", "Same as username - your Server API Token"),
 			},
@@ -107,10 +107,10 @@ func GetSMTPProviders() []SMTPProvider {
 			HelpURL:      "https://docs.aws.amazon.com/ses/latest/dg/send-email-smtp.html",
 			Logo:         "/providers/aws-ses.svg",
 			Fields: []SMTPProviderField{
-				FromEmailField("noreply@yourdomain.com", "The email address to send from (must be verified in AWS SES)"),
+				FromEmailField(DefaultFromEmail, "The email address to send from (must be verified in AWS SES)"),
 				RegionField("AWS Region", "us-east-1", "AWS region for your SES service"),
-				UsernameField("SMTP Username", "", "Your AWS SES SMTP username"),
-				PasswordField("SMTP Password", "Your AWS SES SMTP password"),
+				UsernameField(LabelSMTPUsername, "", "Your AWS SES SMTP username"),
+				PasswordField(LabelSMTPPassword, "Your AWS SES SMTP password"),
 			},
 		},
 		{
@@ -128,7 +128,7 @@ func GetSMTPProviders() []SMTPProvider {
 			Fields: []SMTPProviderField{
 				FromEmailField(DefaultFromEmail, DefaultFromDescription),
 				FixedUsernameField("SMTP Username", "SMTP_Injection", "Use 'SMTP_Injection' as username"),
-				APIKeyPasswordField("API Key", "", "Your SparkPost API Key"),
+				APIKeyPasswordField(LabelAPIKey, "", "Your SparkPost API Key"),
 			},
 		},
 		{
@@ -163,7 +163,7 @@ func GetSMTPProviders() []SMTPProvider {
 			Logo:         "/providers/mailjet.svg",
 			Fields: []SMTPProviderField{
 				FromEmailField(DefaultFromEmail, DefaultFromDescription),
-				UsernameField("API Key", "", "Your Mailjet API Key"),
+				UsernameField(LabelAPIKey, "", "Your Mailjet API Key"),
 				PasswordField("Secret Key", "Your Mailjet Secret Key"),
 			},
 		},

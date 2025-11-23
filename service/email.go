@@ -24,6 +24,17 @@ const (
 	defaultNoReplyAddr = "noreply@example.com"
 )
 
+// smtpConfig holds SMTP configuration
+type smtpConfig struct {
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	FromEmail string
+	UseTLS    bool
+	UseSSL    bool
+}
+
 // EmailService handles email operations
 type EmailService struct {
 	db *gorm.DB
@@ -428,7 +439,28 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, template mo
 		ServerName:         config.Host,
 	}
 
-	// Determine the connection method based on configuration
+	// Connect to SMTP server
+	client, err := s.connectSMTPClient(config, tlsConfig)
+	if err != nil {
+		return err
+	}
+	defer client.Quit()
+
+	// Authenticate
+	if err := s.authenticateSMTP(client, auth, config); err != nil {
+		return err
+	}
+
+	// Send the email
+	if err := s.sendSMTPMessage(client, emailLog, template, service, htmlContent, textContent, attachments); err != nil {
+		return err
+	}
+
+	log.Printf("✓ Email sent successfully to %s", emailLog.ToEmail)
+	return nil
+}
+
+func (s *EmailService) connectSMTPClient(config smtpConfig, tlsConfig *tls.Config) (*smtp.Client, error) {
 	var client *smtp.Client
 	var err error
 
@@ -437,33 +469,36 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, template mo
 		log.Printf("Connecting via SSL to %s:%d", config.Host, config.Port)
 		conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", config.Host, config.Port), tlsConfig)
 		if err != nil {
-			return fmt.Errorf("failed to connect to SMTP server (SSL): %w", err)
+			return nil, fmt.Errorf("failed to connect to SMTP server (SSL): %w", err)
 		}
-		defer conn.Close()
 
 		client, err = smtp.NewClient(conn, config.Host)
 		if err != nil {
-			return fmt.Errorf("failed to create SMTP client: %w", err)
+			conn.Close()
+			return nil, fmt.Errorf("failed to create SMTP client: %w", err)
 		}
 	} else {
 		// Plain or STARTTLS connection (port 587/25)
 		log.Printf("Connecting to %s:%d", config.Host, config.Port)
 		client, err = smtp.Dial(fmt.Sprintf("%s:%d", config.Host, config.Port))
 		if err != nil {
-			return fmt.Errorf("failed to connect to SMTP server: %w", err)
+			return nil, fmt.Errorf("failed to connect to SMTP server: %w", err)
 		}
 
 		// Use STARTTLS if enabled
 		if config.UseTLS {
 			log.Printf("Starting TLS negotiation")
 			if err = client.StartTLS(tlsConfig); err != nil {
-				return fmt.Errorf("failed to start TLS: %w", err)
+				client.Close()
+				return nil, fmt.Errorf("failed to start TLS: %w", err)
 			}
 		}
 	}
-	defer client.Quit()
 
-	// Authenticate
+	return client, nil
+}
+
+func (s *EmailService) authenticateSMTP(client *smtp.Client, auth smtp.Auth, config smtpConfig) error {
 	if config.Username != "" && config.Password != "" {
 		log.Printf("Authenticating as %s", config.Username)
 		if err := client.Auth(auth); err != nil {
@@ -471,9 +506,11 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, template mo
 		}
 		log.Printf("Authentication successful")
 	}
+	return nil
+}
 
-	// Set sender - use the from_email configured in the service (NOT from SMTP config)
-	// The emailLog.FromEmail already contains the correct sender email from service.FromEmail
+func (s *EmailService) sendSMTPMessage(client *smtp.Client, emailLog models.EmailLog, template models.Template, service models.EmailService, htmlContent, textContent string, attachments []models.EmailAttachment) error {
+	// Set sender
 	fromEmail := emailLog.FromEmail
 	log.Printf("Setting sender: %s", fromEmail)
 	if err := client.Mail(fromEmail); err != nil {
@@ -502,7 +539,6 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, template mo
 		return fmt.Errorf("failed to write message: %w", err)
 	}
 
-	log.Printf("✓ Email sent successfully to %s", emailLog.ToEmail)
 	return nil
 }
 
@@ -664,15 +700,7 @@ func stripHTML(html string) string {
 	return text
 }
 
-func parseSMTPConfig(config string) struct {
-	Host      string
-	Port      int
-	Username  string
-	Password  string
-	FromEmail string
-	UseTLS    bool
-	UseSSL    bool
-} {
+func parseSMTPConfig(config string) smtpConfig {
 	// Decrypt configuration (GAP-SEC-005)
 	encryption, err := utils.NewEncryptionService()
 	var decryptedConfig string
@@ -690,15 +718,7 @@ func parseSMTPConfig(config string) struct {
 	var configMap map[string]interface{}
 	if err := json.Unmarshal([]byte(decryptedConfig), &configMap); err != nil {
 		// Return default if parsing fails
-		return struct {
-			Host      string
-			Port      int
-			Username  string
-			Password  string
-			FromEmail string
-			UseTLS    bool
-			UseSSL    bool
-		}{
+		return smtpConfig{
 			Host:      "smtp.example.com",
 			Port:      587,
 			Username:  "user@example.com",
@@ -745,15 +765,7 @@ func parseSMTPConfig(config string) struct {
 		useSSL = s
 	}
 
-	return struct {
-		Host      string
-		Port      int
-		Username  string
-		Password  string
-		FromEmail string
-		UseTLS    bool
-		UseSSL    bool
-	}{
+	return smtpConfig{
 		Host:      host,
 		Port:      port,
 		Username:  username,

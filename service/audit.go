@@ -32,20 +32,23 @@ type AuditEventDetails struct {
 	Additional map[string]interface{} `json:"additional,omitempty"`
 }
 
+// AuditEventParams holds parameters for audit logging
+type AuditEventParams struct {
+	UserID     *uuid.UUID
+	Action     string
+	Resource   string
+	ResourceID *uuid.UUID
+	Status     string
+	IPAddress  string
+	UserAgent  string
+	Details    *AuditEventDetails
+}
+
 // LogEvent creates an audit log entry
-func (s *AuditService) LogEvent(
-	userID *uuid.UUID,
-	action string,
-	resource string,
-	resourceID *uuid.UUID,
-	status string,
-	ipAddress string,
-	userAgent string,
-	details *AuditEventDetails,
-) error {
+func (s *AuditService) LogEvent(params *AuditEventParams) error {
 	var detailsJSON string
-	if details != nil {
-		bytes, err := json.Marshal(details)
+	if params.Details != nil {
+		bytes, err := json.Marshal(params.Details)
 		if err != nil {
 			detailsJSON = "{}"
 		} else {
@@ -54,13 +57,13 @@ func (s *AuditService) LogEvent(
 	}
 
 	auditLog := models.AuditLog{
-		UserID:     userID,
-		Action:     action,
-		Resource:   resource,
-		ResourceID: resourceID,
-		IPAddress:  ipAddress,
-		UserAgent:  userAgent,
-		Status:     status,
+		UserID:     params.UserID,
+		Action:     params.Action,
+		Resource:   params.Resource,
+		ResourceID: params.ResourceID,
+		IPAddress:  params.IPAddress,
+		UserAgent:  params.UserAgent,
+		Status:     params.Status,
 		Details:    detailsJSON,
 		Timestamp:  time.Now(),
 	}
@@ -75,61 +78,58 @@ func (s *AuditService) LogLogin(userID *uuid.UUID, email string, success bool, i
 		status = "failure"
 	}
 
-	return s.LogEvent(
-		userID,
-		"login",
-		"user",
-		userID,
-		status,
-		ipAddress,
-		userAgent,
-		&AuditEventDetails{
+	return s.LogEvent(&AuditEventParams{
+		UserID:     userID,
+		Action:     "login",
+		Resource:   "user",
+		ResourceID: userID,
+		Status:     status,
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+		Details: &AuditEventDetails{
 			Email:  email,
 			Reason: reason,
 		},
-	)
+	})
 }
 
 // LogLogout logs logout events
 func (s *AuditService) LogLogout(userID uuid.UUID, ipAddress string, userAgent string) error {
-	return s.LogEvent(
-		&userID,
-		"logout",
-		"user",
-		&userID,
-		"success",
-		ipAddress,
-		userAgent,
-		nil,
-	)
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     "logout",
+		Resource:   "user",
+		ResourceID: &userID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+	})
 }
 
 // LogPasswordChange logs password change events
 func (s *AuditService) LogPasswordChange(userID uuid.UUID, ipAddress string, userAgent string) error {
-	return s.LogEvent(
-		&userID,
-		"password_change",
-		"user",
-		&userID,
-		"success",
-		ipAddress,
-		userAgent,
-		nil,
-	)
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     "password_change",
+		Resource:   "user",
+		ResourceID: &userID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+	})
 }
 
 // LogDataAccess logs access to sensitive data
 func (s *AuditService) LogDataAccess(userID uuid.UUID, resource string, resourceID uuid.UUID, ipAddress string, userAgent string) error {
-	return s.LogEvent(
-		&userID,
-		"data_access",
-		resource,
-		&resourceID,
-		"success",
-		ipAddress,
-		userAgent,
-		nil,
-	)
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     "data_access",
+		Resource:   resource,
+		ResourceID: &resourceID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+	})
 }
 
 // LogDataModification logs modifications to data
@@ -142,79 +142,77 @@ func (s *AuditService) LogDataModification(
 	ipAddress string,
 	userAgent string,
 ) error {
-	return s.LogEvent(
-		&userID,
-		action,
-		resource,
-		&resourceID,
-		"success",
-		ipAddress,
-		userAgent,
-		&AuditEventDetails{
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     action,
+		Resource:   resource,
+		ResourceID: &resourceID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+		Details: &AuditEventDetails{
 			Changes: changes,
 		},
-	)
+	})
 }
 
 // LogAPIKeyCreated logs API key creation
 func (s *AuditService) LogAPIKeyCreated(userID uuid.UUID, keyID uuid.UUID, ipAddress string, userAgent string) error {
-	return s.LogEvent(
-		&userID,
-		"api_key_created",
-		"api_key",
-		&keyID,
-		"success",
-		ipAddress,
-		userAgent,
-		nil,
-	)
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     "api_key_created",
+		Resource:   "api_key",
+		ResourceID: &keyID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+	})
 }
 
 // LogAPIKeyDeleted logs API key deletion
 func (s *AuditService) LogAPIKeyDeleted(userID uuid.UUID, keyID uuid.UUID, ipAddress string, userAgent string) error {
-	return s.LogEvent(
-		&userID,
-		"api_key_deleted",
-		"api_key",
-		&keyID,
-		"success",
-		ipAddress,
-		userAgent,
-		nil,
-	)
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     "api_key_deleted",
+		Resource:   "api_key",
+		ResourceID: &keyID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+	})
 }
 
 // LogAccountLocked logs account lockout events
 func (s *AuditService) LogAccountLocked(userID uuid.UUID, email string, reason string, ipAddress string, userAgent string) error {
-	return s.LogEvent(
-		&userID,
-		"account_locked",
-		"user",
-		&userID,
-		"success",
-		ipAddress,
-		userAgent,
-		&AuditEventDetails{
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     "account_locked",
+		Resource:   "user",
+		ResourceID: &userID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+		Details: &AuditEventDetails{
 			Email:  email,
 			Reason: reason,
 		},
-	)
+	})
 }
 
 // LogAccountUnlocked logs account unlock events
 func (s *AuditService) LogAccountUnlocked(userID uuid.UUID, email string, ipAddress string, userAgent string) error {
-	return s.LogEvent(
-		&userID,
-		"account_unlocked",
-		"user",
-		&userID,
-		"success",
-		ipAddress,
-		userAgent,
-		&AuditEventDetails{
+	return s.LogEvent(&AuditEventParams{
+		UserID:     &userID,
+		Action:     "account_unlocked",
+		Resource:   "user",
+		ResourceID: &userID,
+		Status:     "success",
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+		Details: &AuditEventDetails{
 			Email: email,
 		},
-	)
+	})
 }
 
 // GetAuditLogs retrieves audit logs with filtering
