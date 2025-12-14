@@ -75,8 +75,8 @@ jobs:
           name: golangci-lint
           command: |
             set -euo pipefail
-            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-              | sh -s -- -b /usr/local/bin v1.64.0
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.7.2
+            
             golangci-lint version
             golangci-lint run ./...
       - run:
