@@ -1,41 +1,10 @@
-name: Release (Conventional Commits)
+name: "[DISABLED] Release (migrated to CircleCI)"
 
 on:
-  push:
-    branches: [main]
-
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
-  release:
-    if: ${{ github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'chore(release):') }}
+  disabled:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets['RELEASE_TOKEN'] != '' && secrets['RELEASE_TOKEN'] || github.token }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets['RELEASE_TOKEN'] != '' && secrets['RELEASE_TOKEN'] || github.token }}
-        run: |
-          npx -y \
-            -p semantic-release@^24 \
-            -p @semantic-release/commit-analyzer@^13 \
-            -p @semantic-release/release-notes-generator@^14 \
-            -p @semantic-release/changelog@^6 \
-            -p @semantic-release/git@^10 \
-            -p @semantic-release/github@^11 \
-            semantic-release
+      - run: echo "This GitHub Actions workflow is disabled. Use CircleCI (.circleci/config.yml)."

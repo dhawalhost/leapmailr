@@ -4,10 +4,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "generic-app.workloadFullname" (list $root $name) }}
+  name: {{ include "leapmailr.workloadFullname" (list $root $name) }}
   labels:
-    {{- include "generic-app.labels" $root | nindent 4 }}
-    {{- include "generic-app.selectorLabels" (list $root $name) | nindent 4 }}
+    {{- include "leapmailr.labels" $root | nindent 4 }}
+    {{- include "leapmailr.selectorLabels" (list $root $name) | nindent 4 }}
   annotations:
     {{- $anns := merge (deepCopy ($root.Values.global.ingress.annotations | default dict)) (deepCopy ($w.ingress.annotations | default dict)) -}}
     {{- toYaml $anns | nindent 4 }}
@@ -30,7 +30,7 @@ spec:
             pathType: {{ .pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ include "generic-app.workloadFullname" (list $root $name) }}
+                name: {{ include "leapmailr.workloadFullname" (list $root $name) }}
                 port:
                   number: {{ .servicePort | default ($w.service.port | default ($w.containerPort | default 80)) }}
           {{- end }}

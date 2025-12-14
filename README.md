@@ -46,13 +46,14 @@ docker-compose up -d
 This repo uses **Conventional Commits** to automatically generate semver tags.
 
 **How it works**
-- Merges to `main` run `.github/workflows/release.yml` (**Release (Conventional Commits)**).
-- It creates a git tag like `v0.2.3`, updates `CHANGELOG.md`, and creates a GitHub Release.
-- Tag pushes (`v*`) trigger `.github/workflows/ci.yml` to build/push Docker images to GHCR.
+- Merges to `main` run CircleCI (`.circleci/config.yml`).
+- CircleCI runs `semantic-release`, creates a git tag like `v0.2.3`, updates `CHANGELOG.md`, and creates a GitHub Release.
+- In the same pipeline, CircleCI builds/pushes Docker images to GHCR (`:vX.Y.Z` and `:sha-<12>` tags).
 - ArgoCD Image Updater tracks the highest semver tag and updates Helm values accordingly.
 
-**Required secret (recommended)**
-- Add a repo secret named `RELEASE_TOKEN` (a GitHub PAT). This ensures the tag pushed by the release workflow can trigger the image-build workflow.
+**CircleCI environment variables (required)**
+- `GITHUB_TOKEN`: GitHub PAT for `semantic-release` (push tags + create release + commit `CHANGELOG.md`).
+- `GHCR_USERNAME` and `GHCR_TOKEN`: credentials for pushing to GHCR.
 
 **Version bump rules**
 - `fix: ...` → patch

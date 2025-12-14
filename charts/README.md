@@ -1,11 +1,11 @@
-# generic-app Helm chart
+# leapmailr Helm chart
 
 A reusable Helm chart that deploys one or more workloads from a `workloads` map.
 
 ## Install
 
 ```bash
-helm upgrade --install leapmailr ./helm/generic-app \
+helm upgrade --install leapmailr ./charts \
   --namespace leapmailr --create-namespace
 ```
 
@@ -25,4 +25,25 @@ Common keys per workload:
 - `envFrom` appended with `global.envFrom`
 - `resources`, `livenessProbe`, `readinessProbe`
 
-This chart is intentionally generic so you can copy it to future projects.
+This chart deploys the leapmailr backend workload.
+
+## FQDN / Ingress hosts
+
+Set hostnames per workload using `workloads.<name>.ingress.hosts`.
+
+Example:
+
+```yaml
+workloads:
+  backend:
+    ingress:
+      enabled: true
+      hosts:
+        - host: api.leapmailr.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: 8080
+```
+
+In this repo, deploy-time configuration lives in `charts/values.yaml`.

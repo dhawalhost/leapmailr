@@ -1,18 +1,18 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "generic-app.name" -}}
+{{- define "leapmailr.name" -}}
 {{- default .Chart.Name .Values.global.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "generic-app.fullname" -}}
+{{- define "leapmailr.fullname" -}}
 {{- if .Values.global.fullnameOverride -}}
 {{- .Values.global.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
-{{- $name := include "generic-app.name" . -}}
+{{- $name := include "leapmailr.name" . -}}
 {{- printf "%s" $name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 {{- end -}}
@@ -20,8 +20,8 @@ Create a default fully qualified app name.
 {{/*
 Common labels
 */}}
-{{- define "generic-app.labels" -}}
-app.kubernetes.io/name: {{ include "generic-app.name" . }}
+{{- define "leapmailr.labels" -}}
+app.kubernetes.io/name: {{ include "leapmailr.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
@@ -33,19 +33,19 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 {{/*
 Workload fullname
 */}}
-{{- define "generic-app.workloadFullname" -}}
+{{- define "leapmailr.workloadFullname" -}}
 {{- $root := index . 0 -}}
 {{- $workloadName := index . 1 -}}
-{{- printf "%s-%s" (include "generic-app.fullname" $root) $workloadName | trunc 63 | trimSuffix "-" -}}
+{{- printf "%s-%s" (include "leapmailr.fullname" $root) $workloadName | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Selector labels
 */}}
-{{- define "generic-app.selectorLabels" -}}
+{{- define "leapmailr.selectorLabels" -}}
 {{- $root := index . 0 -}}
 {{- $workloadName := index . 1 -}}
-app.kubernetes.io/name: {{ include "generic-app.name" $root }}
+app.kubernetes.io/name: {{ include "leapmailr.name" $root }}
 app.kubernetes.io/instance: {{ $root.Release.Name }}
 app.kubernetes.io/component: {{ $workloadName }}
 {{- end -}}
@@ -53,7 +53,7 @@ app.kubernetes.io/component: {{ $workloadName }}
 {{/*
 Resolve imagePullSecrets
 */}}
-{{- define "generic-app.imagePullSecrets" -}}
+{{- define "leapmailr.imagePullSecrets" -}}
 {{- $secrets := (.Values.global.imagePullSecrets | default list) -}}
 {{- if $secrets -}}
 imagePullSecrets:

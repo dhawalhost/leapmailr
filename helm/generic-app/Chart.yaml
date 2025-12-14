@@ -1,6 +1,0 @@
-apiVersion: v2
-name: generic-app
-description: Generic Helm chart for deploying one or more app workloads (Deployment/Service/Ingress) driven by values.
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

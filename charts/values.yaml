@@ -41,11 +41,11 @@ workloads:
   backend:
     enabled: true
 
-    replicas: 2
+    replicas: 1
 
     image:
       repository: ghcr.io/dhawalhost/leapmailr
-      tag: "v0.0.0"
+      tag: "v0.2.0"
       pullPolicy: IfNotPresent
 
     containerPort: 8080
@@ -56,17 +56,27 @@ workloads:
       port: 8080
 
     ingress:
-      enabled: false
+      enabled: true
       className: ""
       annotations: {}
-      hosts: []
+      hosts:
+        - host: api.leapmailr.dhawalhost.com
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: 8080
       tls: []
 
     env:
       ENV_MODE: production
       PORT: "8080"
 
-    envFrom: []
+    # Load non-secret config + secrets from existing K8s objects
+    envFrom:
+      - configMapRef:
+          name: leapmailr-backend-config
+      - secretRef:
+          name: leapmailr-backend-secrets
 
     resources: {}
 
@@ -82,55 +92,6 @@ workloads:
     readinessProbe:
       httpGet:
         path: /health/ready
-        port: http
-      initialDelaySeconds: 5
-      periodSeconds: 10
-      timeoutSeconds: 2
-      failureThreshold: 6
-
-  frontend:
-    enabled: true
-
-    replicas: 2
-
-    image:
-      repository: ghcr.io/dhawalhost/leapmailr-ui
-      tag: "v0.0.0"
-      pullPolicy: IfNotPresent
-
-    containerPort: 3000
-
-    service:
-      enabled: true
-      type: ClusterIP
-      port: 3000
-
-    ingress:
-      enabled: false
-      className: ""
-      annotations: {}
-      hosts: []
-      tls: []
-
-    env:
-      NODE_ENV: production
-
-    envFrom: []
-
-    resources: {}
-
-    livenessProbe:
-      httpGet:
-        path: /
-        port: http
-      initialDelaySeconds: 15
-      periodSeconds: 10
-      timeoutSeconds: 2
-      failureThreshold: 6
-
-    readinessProbe:
-      httpGet:
-        path: /
         port: http
       initialDelaySeconds: 5
       periodSeconds: 10

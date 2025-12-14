@@ -4,10 +4,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "generic-app.workloadFullname" (list $root $name) }}
+  name: {{ include "leapmailr.workloadFullname" (list $root $name) }}
   labels:
-    {{- include "generic-app.labels" $root | nindent 4 }}
-    {{- include "generic-app.selectorLabels" (list $root $name) | nindent 4 }}
+    {{- include "leapmailr.labels" $root | nindent 4 }}
+    {{- include "leapmailr.selectorLabels" (list $root $name) | nindent 4 }}
   {{- with ($root.Values.global.annotations | default dict) }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -16,11 +16,11 @@ spec:
   replicas: {{ $w.replicas | default 1 }}
   selector:
     matchLabels:
-      {{- include "generic-app.selectorLabels" (list $root $name) | nindent 6 }}
+      {{- include "leapmailr.selectorLabels" (list $root $name) | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "generic-app.selectorLabels" (list $root $name) | nindent 8 }}
+        {{- include "leapmailr.selectorLabels" (list $root $name) | nindent 8 }}
         {{- with ($root.Values.global.podLabels | default dict) }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -31,12 +31,12 @@ spec:
       {{- end }}
     spec:
       {{- if $root.Values.global.serviceAccount.create }}
-      serviceAccountName: {{ default (include "generic-app.fullname" $root) $root.Values.global.serviceAccount.name }}
+      serviceAccountName: {{ default (include "leapmailr.fullname" $root) $root.Values.global.serviceAccount.name }}
       {{- else if $root.Values.global.serviceAccount.name }}
       serviceAccountName: {{ $root.Values.global.serviceAccount.name }}
       {{- end }}
 
-      {{- include "generic-app.imagePullSecrets" $root | nindent 6 }}
+      {{- include "leapmailr.imagePullSecrets" $root | nindent 6 }}
 
       {{- with ($root.Values.global.podSecurityContext | default dict) }}
       securityContext:

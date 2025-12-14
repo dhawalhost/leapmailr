@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: leapmailr-backend-config
+  namespace: leapmailr
+data:
+  PORT: "8080"
+  ENV_MODE: "production"
+  BASE_URL: "https://api.leapmailr.dhawalhost.com"
+
+  DB_HOST: "postgres"
+  DB_USER: "leapmailr"
+  DB_NAME: "leapmailr"
+  DB_PORT: "5432"
+  DB_SSLMODE: "disable"
+  DB_TIMEZONE: "UTC"
+
+  JWT_EXPIRATION_HOURS: "24"
+  JWT_REFRESH_DAYS: "30"
+
+  COMPANY_NAME: "LeapMailr"
+  DEFAULT_SENDER_MAIL: "noreply@dhawalhost.com"
+  CONTACT_MAIL: "contact@dhawalhost.com"
+  LOGO_URL: "https://leapmailr.dhawalhost.com/assets/logo.png"
+
+  RATE_LIMIT: "100"

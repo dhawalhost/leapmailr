@@ -14,7 +14,7 @@ var (
 	startTime     time.Time
 	// Application version - should be overridden at build time using -ldflags
 	// Example: go build -ldflags "-X 'github.com/dhawalhost/leapmailr/handlers.appVersion=1.2.3'"
-	appVersion = "1.0.0"
+	appVersion = "0.2.0"
 )
 
 func init() {

@@ -1,12 +1,11 @@
 # ArgoCD Image Updater (recommended)
 
-This repo’s GitHub Actions pipelines build/push container images only.
+This repo’s CI (CircleCI) builds/pushes container images only.
 CD is handled by ArgoCD + Helm, with **ArgoCD Image Updater** automatically updating image tags in your Helm repo.
 
 ## Images produced by CI
 
 - Backend: `ghcr.io/<OWNER>/leapmailr`
-- Frontend: `ghcr.io/<OWNER>/leapmailr-ui`
 
 Tagging strategy (recommended for Image Updater):
 - release tags (semver): `vMAJOR.MINOR.PATCH` (example: `v1.2.3`)
@@ -37,23 +36,24 @@ metadata:
   annotations:
     argocd-image-updater.argoproj.io/image-list: |
       backend=ghcr.io/<OWNER>/leapmailr
-      frontend=ghcr.io/<OWNER>/leapmailr-ui
 
     # Only consider release tags produced by CI
     argocd-image-updater.argoproj.io/backend.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
-    argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
 
     # Pick the highest semver tag
     argocd-image-updater.argoproj.io/backend.update-strategy: semver
-    argocd-image-updater.argoproj.io/frontend.update-strategy: semver
 
     # Write back into Git (Helm repo)
     argocd-image-updater.argoproj.io/write-back-method: git
 
+    # Optional but recommended if you use multiple values files:
+    # write-back-target chooses which values file gets modified.
+    # Example:
+    # argocd-image-updater.argoproj.io/write-back-target: helmvalues:/charts/values.yaml
+
     # Tell Image Updater where the tag lives in Helm values
-    # For this repo's chart at helm/generic-app:
+    # For this repo's chart at charts:
     argocd-image-updater.argoproj.io/backend.helm.image-tag: workloads.backend.image.tag
-    argocd-image-updater.argoproj.io/frontend.helm.image-tag: workloads.frontend.image.tag
 
     # Optional: keep commits tidy
     argocd-image-updater.argoproj.io/git-commit-message: "chore(images): bump {{ .AppName }}"
@@ -67,10 +67,6 @@ workloads:
     image:
       repository: ghcr.io/<OWNER>/leapmailr
       tag: v0.0.0
-  frontend:
-    image:
-      repository: ghcr.io/<OWNER>/leapmailr-ui
-      tag: v0.0.0
 ```
 
 ### Option B: track immutable tags via regexp (no semver)
@@ -82,17 +78,13 @@ metadata:
   annotations:
     argocd-image-updater.argoproj.io/image-list: |
       backend=ghcr.io/<OWNER>/leapmailr
-      frontend=ghcr.io/<OWNER>/leapmailr-ui
 
     argocd-image-updater.argoproj.io/backend.allow-tags: regexp:^sha-[0-9a-f]{12}$
-    argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^sha-[0-9a-f]{12}$
 
     argocd-image-updater.argoproj.io/backend.update-strategy: newest-build
-    argocd-image-updater.argoproj.io/frontend.update-strategy: newest-build
 
     argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/backend.helm.image-tag: workloads.backend.image.tag
-    argocd-image-updater.argoproj.io/frontend.helm.image-tag: workloads.frontend.image.tag
 ```
 
 ### Option B: update by digest (works well with mutable tags)
@@ -104,16 +96,13 @@ metadata:
   annotations:
     argocd-image-updater.argoproj.io/image-list: |
       backend=ghcr.io/<OWNER>/leapmailr:main
-      frontend=ghcr.io/<OWNER>/leapmailr-ui:main
 
     argocd-image-updater.argoproj.io/backend.update-strategy: digest
-    argocd-image-updater.argoproj.io/frontend.update-strategy: digest
 
     argocd-image-updater.argoproj.io/write-back-method: git
 
     # Update these to match your chart’s digest fields.
     argocd-image-updater.argoproj.io/backend.helm.image-digest: backend.image.digest
-    argocd-image-updater.argoproj.io/frontend.helm.image-digest: frontend.image.digest
 ```
 
 ## Registry credentials (GHCR)
@@ -129,3 +118,4 @@ Typical approaches:
 - CI builds/tests and pushes images to GHCR.
 - CI does **not** deploy.
 - ArgoCD syncs changes; Image Updater is what drives tag bumps.
+

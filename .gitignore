@@ -22,3 +22,9 @@
 go.work
 .target
 .env
+
+# Kubernetes plaintext secrets (keep *.example.yaml committed)
+# Note: do NOT ignore SealedSecret manifests.
+/k8s/*-secret.yaml
+/k8s/*-secrets.yaml
+/k8s/secrets.yaml

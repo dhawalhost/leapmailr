@@ -1,0 +1,207 @@
+version: 2.1
+
+executors:
+  go:
+    docker:
+      - image: cimg/go:1.23
+      - image: postgres:15-alpine
+        environment:
+          POSTGRES_DB: leapmailr_test
+          POSTGRES_USER: leapmailr
+          POSTGRES_PASSWORD: testpass123
+
+  node:
+    docker:
+      - image: cimg/node:20.11
+
+  docker-base:
+    docker:
+      - image: cimg/base:stable
+
+commands:
+  docker-login-ghcr:
+    steps:
+      - run:
+          name: Login to GHCR
+          command: |
+            set -euo pipefail
+            : "${GHCR_USERNAME:?Set GHCR_USERNAME in CircleCI project/env context}"
+            : "${GHCR_TOKEN:?Set GHCR_TOKEN in CircleCI project/env context}"
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+jobs:
+  backend_test:
+    executor: go
+    environment:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USER: leapmailr
+      DB_PASSWORD: testpass123
+      DB_NAME: leapmailr_test
+      DB_SSLMODE: disable
+      ENCRYPTION_KEY: test-encryption-key-32-chars!!
+      JWT_SECRET: test-jwt-secret-key
+      ENV_MODE: test
+      PORT: 8080
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
+            - go-mod-v1-
+      - run:
+          name: Wait for Postgres
+          command: |
+            set -euo pipefail
+            for i in $(seq 1 30); do
+              (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && exit 0
+              sleep 1
+            done
+            echo "Postgres did not become ready" >&2
+            exit 1
+      - run:
+          name: Go fmt (check)
+          command: |
+            set -euo pipefail
+            if [ -n "$(gofmt -l .)" ]; then
+              echo "Go code is not formatted:";
+              gofmt -d .
+              exit 1
+            fi
+      - run:
+          name: Go vet
+          command: go vet ./...
+      - run:
+          name: golangci-lint
+          command: |
+            set -euo pipefail
+            curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+              | sh -s -- -b /usr/local/bin v1.64.0
+            golangci-lint version
+            golangci-lint run ./...
+      - run:
+          name: Test
+          command: go test -v -race -coverprofile=coverage.out ./...
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod
+
+  backend_release:
+    executor: node
+    steps:
+      - checkout
+      - run:
+          name: Fetch git history & tags
+          command: |
+            set -euo pipefail
+            git fetch --prune --unshallow || true
+            git fetch --tags --force
+      - run:
+          name: Derive release tag from chart appVersion
+          command: |
+            set -euo pipefail
+
+            # Source of truth for releases: Helm chart appVersion
+            APP_VERSION="$(awk -F': *' '$1=="appVersion"{print $2}' charts/Chart.yaml | head -n 1 | tr -d '"' | tr -d "'")"
+            if [ -z "$APP_VERSION" ]; then
+              echo "Could not read appVersion from charts/Chart.yaml"
+              exit 1
+            fi
+
+            RELEASE_TAG="v${APP_VERSION#v}"
+            echo "Using release tag: $RELEASE_TAG"
+            echo "RELEASE_TAG=$RELEASE_TAG" > /tmp/release.env
+      - run:
+          name: Create and push git tag
+          command: |
+            set -euo pipefail
+            source /tmp/release.env
+
+            git config user.name "circleci"
+            git config user.email "circleci@users.noreply.github.com"
+
+            if git rev-parse "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+              TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+              if [ "$TAG_SHA" = "$CIRCLE_SHA1" ]; then
+                echo "Tag $RELEASE_TAG already exists on this commit; continuing."
+              else
+                echo "Tag $RELEASE_TAG already exists (points to $TAG_SHA)."
+                echo "Bump charts/Chart.yaml appVersion to release a new version."
+                exit 1
+              fi
+            else
+              git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+              git push origin "$RELEASE_TAG"
+            fi
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - release.env
+
+  backend_build_and_push:
+    executor: docker-base
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Check if a release was published
+          command: |
+            set -euo pipefail
+            source /tmp/release.env
+            if [ -z "${RELEASE_TAG:-}" ]; then
+              echo "No release tag; skipping image build/push."
+              circleci step halt
+            fi
+      - docker-login-ghcr
+      - run:
+          name: Build and push (multi-arch)
+          command: |
+            set -euo pipefail
+            source /tmp/release.env
+            SHORT_SHA="${CIRCLE_SHA1:0:12}"
+
+            docker run --privileged --rm tonistiigi/binfmt --install all
+            docker buildx create --use
+
+            OWNER="${GHCR_OWNER:-$CIRCLE_PROJECT_USERNAME}"
+            IMAGE="ghcr.io/${OWNER}/leapmailr"
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --build-arg GO_VERSION=1.23 \
+              -t "$IMAGE:$RELEASE_TAG" \
+              -t "$IMAGE:sha-$SHORT_SHA" \
+              --push \
+              .
+
+workflows:
+  version: 2
+
+  pr:
+    jobs:
+      - backend_test:
+          filters:
+            branches:
+              ignore: main
+
+  main:
+    jobs:
+      - backend_test:
+          filters:
+            branches:
+              only: main
+      - backend_release:
+          requires:
+            - backend_test
+          filters:
+            branches:
+              only: main
+      - backend_build_and_push:
+          requires:
+            - backend_release
+          filters:
+            branches:
+              only: main

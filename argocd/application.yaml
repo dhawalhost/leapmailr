@@ -1,42 +1,26 @@
-# Apply this to your cluster (usually in the argocd namespace).
-# Update:
-# - metadata.name
-# - spec.source.repoURL (this repo URL)
-# - spec.destination.server / spec.destination.namespace
-# - spec.source.targetRevision if needed
-# - optional: Image Updater annotations to match your values paths
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: leapmailr
+  name: leapmailr-backend
   namespace: argocd
   annotations:
-    # ArgoCD Image Updater (recommended)
-    # Update <OWNER> to your GHCR org/user if different.
+    # ArgoCD Image Updater
     argocd-image-updater.argoproj.io/image-list: |
       backend=ghcr.io/dhawalhost/leapmailr
-      frontend=ghcr.io/dhawalhost/leapmailr-ui
 
-    # Only allow release version tags (created by CI)
     argocd-image-updater.argoproj.io/backend.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
-    argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
-
-    # Choose the highest semver tag
     argocd-image-updater.argoproj.io/backend.update-strategy: semver
-    argocd-image-updater.argoproj.io/frontend.update-strategy: semver
 
-    # Write updates back to Git (required for Helm values updates)
     argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/write-back-target: helmvalues:/charts/values.yaml
 
-    # Tell Image Updater where the tag lives in this chart's values
     argocd-image-updater.argoproj.io/backend.helm.image-tag: workloads.backend.image.tag
-    argocd-image-updater.argoproj.io/frontend.helm.image-tag: workloads.frontend.image.tag
 spec:
   project: default
   source:
     repoURL: https://github.com/dhawalhost/leapmailr.git
     targetRevision: main
-    path: helm/generic-app
+    path: charts
     helm:
       valueFiles:
         - values.yaml
