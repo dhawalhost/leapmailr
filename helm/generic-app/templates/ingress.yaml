@@ -1,0 +1,40 @@
+{{- $root := . -}}
+{{- range $name, $w := .Values.workloads }}
+{{- if and $w.enabled ($w.ingress.enabled | default false) }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "generic-app.workloadFullname" (list $root $name) }}
+  labels:
+    {{- include "generic-app.labels" $root | nindent 4 }}
+    {{- include "generic-app.selectorLabels" (list $root $name) | nindent 4 }}
+  annotations:
+    {{- $anns := merge (deepCopy ($root.Values.global.ingress.annotations | default dict)) (deepCopy ($w.ingress.annotations | default dict)) -}}
+    {{- toYaml $anns | nindent 4 }}
+spec:
+  {{- $className := $w.ingress.className | default $root.Values.global.ingress.className -}}
+  {{- if $className }}
+  ingressClassName: {{ $className }}
+  {{- end }}
+  {{- with ($w.ingress.tls | default $root.Values.global.ingress.tls) }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range ($w.ingress.hosts | default list) }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range (.paths | default list) }}
+          - path: {{ .path | default "/" | quote }}
+            pathType: {{ .pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "generic-app.workloadFullname" (list $root $name) }}
+                port:
+                  number: {{ .servicePort | default ($w.service.port | default ($w.containerPort | default 80)) }}
+          {{- end }}
+    {{- end }}
+---
+{{- end }}
+{{- end }}

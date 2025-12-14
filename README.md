@@ -41,6 +41,24 @@ docker-compose up -d
 
 ---
 
+## 🚢 Releases (Conventional Commits)
+
+This repo uses **Conventional Commits** to automatically generate semver tags.
+
+**How it works**
+- Merges to `main` run `.github/workflows/release.yml` (**Release (Conventional Commits)**).
+- It creates a git tag like `v0.2.3`, updates `CHANGELOG.md`, and creates a GitHub Release.
+- Tag pushes (`v*`) trigger `.github/workflows/ci.yml` to build/push Docker images to GHCR.
+- ArgoCD Image Updater tracks the highest semver tag and updates Helm values accordingly.
+
+**Required secret (recommended)**
+- Add a repo secret named `RELEASE_TOKEN` (a GitHub PAT). This ensures the tag pushed by the release workflow can trigger the image-build workflow.
+
+**Version bump rules**
+- `fix: ...` → patch
+- `feat: ...` → minor
+- `feat!: ...` or a commit body containing `BREAKING CHANGE:` → major
+
 ## Overview
 
 LeapMailR is a powerful, production-ready email service platform that enables developers and businesses to send transactional emails with ease. Built with Go for the backend and Next.js for the frontend, LeapMailR provides enterprise-grade features including multi-factor authentication, secrets management, disaster recovery, and comprehensive monitoring.

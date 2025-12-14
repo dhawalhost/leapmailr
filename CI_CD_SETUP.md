@@ -77,13 +77,13 @@ docker-compose up -d
 ```bash
 # Backend
 cd leapmailr
-docker build -t leapmailr-backend .
-docker run -p 8080:8080 --env-file .env leapmailr-backend
+docker build -t leapmailr .
+docker run -p 8080:8080 --env-file .env leapmailr
 
 # Frontend
 cd leapmailr-ui
-docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080 -t leapmailr-frontend .
-docker run -p 3000:3000 leapmailr-frontend
+docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080 -t leapmailr-ui .
+docker run -p 3000:3000 leapmailr-ui
 ```
 
 ### Trigger Deployment
@@ -138,7 +138,7 @@ Ensure the deployment user can:
 
 Images are automatically built and pushed to:
 - GitHub Container Registry: `ghcr.io/yourusername/repository-name`
-- Docker Hub: `yourusername/leapmailr-backend` and `yourusername/leapmailr-frontend`
+- Docker Hub: `yourusername/leapmailr` and `yourusername/leapmailr-ui`
 
 ### Available Tags
 - `latest` - Latest from main branch
@@ -151,8 +151,8 @@ Images are automatically built and pushed to:
 
 ### View Logs
 ```bash
-docker logs -f leapmailr-backend
-docker logs -f leapmailr-frontend
+docker logs -f leapmailr
+docker logs -f leapmailr-ui
 ```
 
 ### Update Containers
@@ -162,8 +162,8 @@ docker pull ghcr.io/yourusername/leapmailr:latest
 docker pull ghcr.io/yourusername/leapmailr-ui:latest
 
 # Recreate containers
-docker stop leapmailr-backend leapmailr-frontend
-docker rm leapmailr-backend leapmailr-frontend
+docker stop leapmailr leapmailr-ui
+docker rm leapmailr leapmailr-ui
 docker run -d [options] ghcr.io/yourusername/leapmailr:latest
 docker run -d [options] ghcr.io/yourusername/leapmailr-ui:latest
 ```

@@ -63,7 +63,7 @@ docker pull ghcr.io/dhawalhost/leapmailr-ui:latest
 
 # Run backend
 docker run -d \
-  --name leapmailr-backend \
+  --name leapmailr \
   -p 8080:8080 \
   -e DB_HOST=postgres \
   -e DB_USER=leapmailr \
@@ -74,7 +74,7 @@ docker run -d \
 
 # Run frontend
 docker run -d \
-  --name leapmailr-frontend \
+  --name leapmailr-ui \
   -p 3000:3000 \
   -e NEXT_PUBLIC_API_URL=http://localhost:8080 \
   ghcr.io/dhawalhost/leapmailr-ui:latest

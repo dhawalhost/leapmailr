@@ -1,9 +1,7 @@
-name: Build and Deploy Go Application
+name: "[DEPRECATED] Build and Deploy Go Application"
 
 on:
-  push:
-    branches:
-      - release
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:

@@ -27,7 +27,7 @@ fi
 # Build backend
 echo ""
 echo "🔨 Building backend Docker image..."
-docker build -t leapmailr-backend:local .
+docker build -t leapmailr:local .
 echo -e "${GREEN}✓ Backend image built${NC}"
 
 # Check if .env exists
@@ -69,11 +69,11 @@ else
 fi
 
 # Remove existing backend container if it exists
-BACKEND_EXISTS=$(docker ps -a --format '{{.Names}}' | grep '^leapmailr-backend$' || echo "")
+BACKEND_EXISTS=$(docker ps -a --format '{{.Names}}' | grep '^leapmailr$' || echo "")
 if [[ -n "$BACKEND_EXISTS" ]]; then
     echo ""
     echo "🔄 Removing existing backend container..."
-    docker rm -f leapmailr-backend
+    docker rm -f leapmailr
 fi
 
 # Start/update backend service
@@ -94,7 +94,7 @@ if curl -f --max-time 2 http://localhost:8080/health &> /dev/null; then
     echo -e "${GREEN}✓ Backend is healthy${NC}"
 else
     echo -e "${YELLOW}⚠️  Backend health check failed${NC}"
-    echo "   Check logs: docker logs leapmailr-backend"
+    echo "   Check logs: docker logs leapmailr"
 fi
 
 # Show running containers

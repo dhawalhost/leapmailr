@@ -593,7 +593,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: leapmailr-backend
+    container_name: leapmailr
     ports:
       - "8080:8080"
       - "9090:9090"  # Metrics
@@ -625,7 +625,7 @@ services:
     build:
       context: ../../leapmailr-ui
       dockerfile: Dockerfile.dev
-    container_name: leapmailr-frontend
+    container_name: leapmailr-ui
     ports:
       - "3000:3000"
     environment:
@@ -780,7 +780,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: your-registry/leapmailr-backend:latest
+        image: your-registry/leapmailr:latest
         ports:
         - containerPort: 8080
           name: http
@@ -861,7 +861,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: your-registry/leapmailr-frontend:latest
+        image: your-registry/leapmailr-ui:latest
         ports:
         - containerPort: 3000
         env:
@@ -1475,7 +1475,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'leapmailr-backend'
+  - job_name: 'leapmailr'
     static_configs:
       - targets: ['localhost:9090']
     metrics_path: '/metrics'

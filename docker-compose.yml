@@ -24,8 +24,8 @@ services:
 
   # Backend Service
   backend:
-    image: leapmailr-backend:local
-    container_name: leapmailr-backend
+    image: leapmailr:local
+    container_name: leapmailr
     restart: unless-stopped
     ports:
       - "8080:8080"

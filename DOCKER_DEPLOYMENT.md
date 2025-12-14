@@ -118,7 +118,7 @@ docker pull ghcr.io/yourusername/leapmailr:latest
 
 # Run container
 docker run -d \
-  --name leapmailr-backend \
+  --name leapmailr \
   --restart unless-stopped \
   -p 8080:8080 \
   --env-file .env \
@@ -132,7 +132,7 @@ docker pull ghcr.io/yourusername/leapmailr-ui:latest
 
 # Run container
 docker run -d \
-  --name leapmailr-frontend \
+  --name leapmailr-ui \
   --restart unless-stopped \
   -p 3000:3000 \
   --env-file .env.local \
@@ -144,15 +144,15 @@ docker run -d \
 **Backend**:
 ```bash
 cd leapmailr
-docker build -t leapmailr-backend:local .
-docker run -d -p 8080:8080 --env-file .env leapmailr-backend:local
+docker build -t leapmailr:local .
+docker run -d -p 8080:8080 --env-file .env leapmailr:local
 ```
 
 **Frontend**:
 ```bash
 cd leapmailr-ui
-docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080 -t leapmailr-frontend:local .
-docker run -d -p 3000:3000 leapmailr-frontend:local
+docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:8080 -t leapmailr-ui:local .
+docker run -d -p 3000:3000 leapmailr-ui:local
 ```
 
 ## Server Setup
@@ -235,7 +235,7 @@ services:
 
   backend:
     image: ghcr.io/yourusername/leapmailr:latest
-    container_name: leapmailr-backend
+    container_name: leapmailr
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -248,7 +248,7 @@ services:
 
   frontend:
     image: ghcr.io/yourusername/leapmailr-ui:latest
-    container_name: leapmailr-frontend
+    container_name: leapmailr-ui
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -346,10 +346,10 @@ docker stats
 **View logs**:
 ```bash
 # Backend
-docker logs -f leapmailr-backend
+docker logs -f leapmailr
 
 # Frontend
-docker logs -f leapmailr-frontend
+docker logs -f leapmailr-ui
 
 # All services
 docker-compose logs -f
@@ -373,10 +373,10 @@ docker exec -i leapmailr-postgres psql -U leapmailr leapmailr < backup.sql
 docker ps
 
 # Stop containers
-docker stop leapmailr-backend leapmailr-frontend
+docker stop leapmailr leapmailr-ui
 
 # Remove containers
-docker rm leapmailr-backend leapmailr-frontend
+docker rm leapmailr leapmailr-ui
 
 # Pull latest images
 docker pull ghcr.io/yourusername/leapmailr:latest
@@ -412,13 +412,13 @@ docker-compose up -d --build
 ### Container won't start
 ```bash
 # Check logs
-docker logs leapmailr-backend
+docker logs leapmailr
 
 # Check if port is already in use
 sudo lsof -i :8080
 
 # Inspect container
-docker inspect leapmailr-backend
+docker inspect leapmailr
 ```
 
 ### Database connection issues

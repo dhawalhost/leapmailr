@@ -1,0 +1,138 @@
+global:
+  nameOverride: ""
+  fullnameOverride: ""
+
+  imagePullSecrets: []
+
+  labels: {}
+  annotations: {}
+
+  podLabels: {}
+  podAnnotations: {}
+
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    tls: []
+
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podSecurityContext: {}
+  securityContext: {}
+
+  env: {}
+  envFrom: []
+
+# One or more workloads to deploy.
+# Each workload creates:
+# - Deployment
+# - Service (optional)
+# - Ingress (optional)
+workloads:
+  backend:
+    enabled: true
+
+    replicas: 2
+
+    image:
+      repository: ghcr.io/dhawalhost/leapmailr
+      tag: "v0.0.0"
+      pullPolicy: IfNotPresent
+
+    containerPort: 8080
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 8080
+
+    ingress:
+      enabled: false
+      className: ""
+      annotations: {}
+      hosts: []
+      tls: []
+
+    env:
+      ENV_MODE: production
+      PORT: "8080"
+
+    envFrom: []
+
+    resources: {}
+
+    livenessProbe:
+      httpGet:
+        path: /health/live
+        port: http
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 6
+
+    readinessProbe:
+      httpGet:
+        path: /health/ready
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 6
+
+  frontend:
+    enabled: true
+
+    replicas: 2
+
+    image:
+      repository: ghcr.io/dhawalhost/leapmailr-ui
+      tag: "v0.0.0"
+      pullPolicy: IfNotPresent
+
+    containerPort: 3000
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 3000
+
+    ingress:
+      enabled: false
+      className: ""
+      annotations: {}
+      hosts: []
+      tls: []
+
+    env:
+      NODE_ENV: production
+
+    envFrom: []
+
+    resources: {}
+
+    livenessProbe:
+      httpGet:
+        path: /
+        port: http
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 6
+
+    readinessProbe:
+      httpGet:
+        path: /
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 6

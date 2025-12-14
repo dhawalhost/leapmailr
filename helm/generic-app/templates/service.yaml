@@ -1,0 +1,22 @@
+{{- $root := . -}}
+{{- range $name, $w := .Values.workloads }}
+{{- if and $w.enabled ($w.service.enabled | default true) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "generic-app.workloadFullname" (list $root $name) }}
+  labels:
+    {{- include "generic-app.labels" $root | nindent 4 }}
+    {{- include "generic-app.selectorLabels" (list $root $name) | nindent 4 }}
+spec:
+  type: {{ $w.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "generic-app.selectorLabels" (list $root $name) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $w.service.port | default ($w.containerPort | default 80) }}
+      targetPort: http
+      protocol: TCP
+---
+{{- end }}
+{{- end }}
