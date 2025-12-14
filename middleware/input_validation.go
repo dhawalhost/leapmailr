@@ -66,10 +66,8 @@ func InputSanitizer() gin.HandlerFunc {
 		}
 
 		// Close and restore the body
-		c.Request.Body.Close()
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
-
-		// Parse JSON
+		_ = c.Request.Body.Close()
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(body)) // Parse JSON
 		var data map[string]interface{}
 		if err := json.Unmarshal(body, &data); err != nil {
 			// Not valid JSON, let the handler deal with it
@@ -186,7 +184,7 @@ func parseRequestBody(c *gin.Context) ([]byte, map[string]interface{}, error) {
 		return nil, nil, err
 	}
 
-	c.Request.Body.Close()
+	_ = c.Request.Body.Close()
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(body, &data); err != nil {

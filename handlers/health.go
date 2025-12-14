@@ -51,9 +51,10 @@ func HandleHealthCheck(c *gin.Context) {
 	}
 
 	statusCode := http.StatusOK
-	if overallStatus == monitoring.HealthStatusDegraded {
+	switch overallStatus {
+	case monitoring.HealthStatusDegraded:
 		statusCode = http.StatusOK // Still considered OK for load balancers
-	} else if overallStatus == monitoring.HealthStatusUnhealthy {
+	case monitoring.HealthStatusUnhealthy:
 		statusCode = http.StatusServiceUnavailable
 	}
 

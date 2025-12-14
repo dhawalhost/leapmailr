@@ -178,7 +178,7 @@ func (s *CaptchaService) verifyReCaptcha(token, secretKey string) (bool, error) 
 	if err != nil {
 		return false, fmt.Errorf("failed to post to reCAPTCHA verify endpoint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result reCaptchaResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -194,7 +194,7 @@ func (s *CaptchaService) verifyHCaptcha(token, secretKey string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to post to hCaptcha verify endpoint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result hCaptchaResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {

@@ -474,7 +474,7 @@ func (s *EmailService) connectSMTPClient(config smtpConfig, tlsConfig *tls.Confi
 
 		client, err = smtp.NewClient(conn, config.Host)
 		if err != nil {
-			conn.Close()
+			_ = conn.Close()
 			return nil, fmt.Errorf("failed to create SMTP client: %w", err)
 		}
 	} else {
@@ -489,7 +489,7 @@ func (s *EmailService) connectSMTPClient(config smtpConfig, tlsConfig *tls.Confi
 		if config.UseTLS {
 			log.Printf("Starting TLS negotiation")
 			if err = client.StartTLS(tlsConfig); err != nil {
-				client.Close()
+				_ = client.Close()
 				return nil, fmt.Errorf("failed to start TLS: %w", err)
 			}
 		}
@@ -532,7 +532,7 @@ func (s *EmailService) sendSMTPMessage(client *smtp.Client, emailLog models.Emai
 	if err != nil {
 		return fmt.Errorf("failed to initialize data: %w", err)
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	_, err = w.Write([]byte(message))
 	if err != nil {
