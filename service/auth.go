@@ -225,11 +225,11 @@ func (s *AuthService) handleFailedLogin(user *models.User, now time.Time, ipAddr
 
 	// Log failed login
 	auditService := NewAuditService()
-		_ = auditService.LogLogin(&user.ID, user.Email, false, ipAddress, userAgent,
-			fmt.Sprintf("invalid password (attempt %d/%d)", user.FailedLoginAttempts, maxFailedAttempts))
+	_ = auditService.LogLogin(&user.ID, user.Email, false, ipAddress, userAgent,
+		fmt.Sprintf("invalid password (attempt %d/%d)", user.FailedLoginAttempts, maxFailedAttempts))
 
 	return errors.New(errInvalidCredentials)
-}// lockAccount locks the user account after too many failed attempts
+} // lockAccount locks the user account after too many failed attempts
 func (s *AuthService) lockAccount(user *models.User, now time.Time, lockoutMinutes int, ipAddress, userAgent string) error {
 	lockoutUntil := now.Add(time.Duration(lockoutMinutes) * time.Minute)
 	user.LockedUntil = &lockoutUntil
