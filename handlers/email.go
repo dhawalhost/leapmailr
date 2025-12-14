@@ -57,7 +57,7 @@ func SendEmailHandler(c *gin.Context) {
 						variables[k] = str
 					}
 				}
-				service.SendAutoReply(autoReplyConfig, req.ToEmail, variables)
+				_ = service.SendAutoReply(autoReplyConfig, req.ToEmail, variables)
 			}()
 		}
 	}
@@ -215,7 +215,7 @@ func SendFormHandler(c *gin.Context) {
 						variables[k] = str
 					}
 				}
-				service.SendAutoReply(autoReplyConfig, emailReq.ToEmail, variables)
+				_ = service.SendAutoReply(autoReplyConfig, emailReq.ToEmail, variables)
 			}()
 		}
 
@@ -265,7 +265,7 @@ func SendFormHandler(c *gin.Context) {
 				// Tag with template ID
 				contactReq.Tags = []string{templateID}
 
-				service.CreateContact(contactReq, user.ID)
+				_, _ = service.CreateContact(contactReq, user.ID)
 			}()
 		}
 	}

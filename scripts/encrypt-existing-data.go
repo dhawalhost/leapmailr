@@ -54,7 +54,7 @@ func main() {
 func confirmBackup() bool {
 	fmt.Print("Have you created a database backup? (yes/no): ")
 	var confirm string
-	fmt.Scanln(&confirm)
+	_, _ = fmt.Scanln(&confirm)
 	if strings.ToLower(confirm) != "yes" {
 		fmt.Println("❌ Please create a backup first using: pg_dump -U postgres leapmailr > backup.sql")
 		return false

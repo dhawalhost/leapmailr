@@ -275,7 +275,7 @@ func generateKey(prefix string) (string, error) {
 func toAPIKeyPairResponse(kp *models.APIKeyPair, includePrivateKey bool) *models.APIKeyPairResponse {
 	var permissions []string
 	if kp.Permissions != "" {
-		json.Unmarshal([]byte(kp.Permissions), &permissions)
+		_ = json.Unmarshal([]byte(kp.Permissions), &permissions)
 	}
 
 	response := &models.APIKeyPairResponse{

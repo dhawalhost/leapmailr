@@ -130,7 +130,7 @@ func (s *MFAService) SetupMFA(userID string, password string) (*models.MFASetupR
 
 	// Log MFA setup initiated
 	userUUID, _ := uuid.Parse(userID)
-	s.audit.LogEvent(&AuditEventParams{
+	_ = s.audit.LogEvent(&AuditEventParams{
 		UserID:     &userUUID,
 		Action:     "mfa_setup_initiated",
 		Resource:   "user",
@@ -193,7 +193,7 @@ func (s *MFAService) VerifyMFASetup(userID string, code string) error {
 
 	// Log MFA enabled
 	userUUID, _ := uuid.Parse(userID)
-	s.audit.LogEvent(&AuditEventParams{
+	_ = s.audit.LogEvent(&AuditEventParams{
 		UserID:     &userUUID,
 		Action:     "mfa_enabled",
 		Resource:   "user",
@@ -232,7 +232,7 @@ func (s *MFAService) VerifyMFACode(userID string, code string) (bool, error) {
 	if valid {
 		monitoring.AuthAttemptsTotal.WithLabelValues("mfa", "success").Inc()
 		userUUID, _ := uuid.Parse(userID)
-		s.audit.LogEvent(&AuditEventParams{
+		_ = s.audit.LogEvent(&AuditEventParams{
 			UserID:     &userUUID,
 			Action:     "mfa_code_verified",
 			Resource:   "user",
@@ -246,7 +246,7 @@ func (s *MFAService) VerifyMFACode(userID string, code string) (bool, error) {
 
 	monitoring.AuthFailuresTotal.WithLabelValues("mfa_login", "invalid_code").Inc()
 	userUUID, _ := uuid.Parse(userID)
-	s.audit.LogEvent(&AuditEventParams{
+	_ = s.audit.LogEvent(&AuditEventParams{
 		UserID:     &userUUID,
 		Action:     "mfa_code_failed",
 		Resource:   "user",
@@ -298,7 +298,7 @@ func (s *MFAService) VerifyBackupCode(userID string, backupCode string) (bool, e
 	if validCodeIndex == -1 {
 		monitoring.AuthFailuresTotal.WithLabelValues("mfa_backup_code", "invalid_code").Inc()
 		userUUID, _ := uuid.Parse(userID)
-		s.audit.LogEvent(&AuditEventParams{
+		_ = s.audit.LogEvent(&AuditEventParams{
 			UserID:     &userUUID,
 			Action:     "mfa_backup_code_failed",
 			Resource:   "user",
@@ -331,7 +331,7 @@ func (s *MFAService) VerifyBackupCode(userID string, backupCode string) (bool, e
 
 	monitoring.AuthAttemptsTotal.WithLabelValues("mfa_backup_code", "success").Inc()
 	userUUID, _ := uuid.Parse(userID)
-	s.audit.LogEvent(&AuditEventParams{
+	_ = s.audit.LogEvent(&AuditEventParams{
 		UserID:     &userUUID,
 		Action:     "mfa_backup_code_used",
 		Resource:   "user",
@@ -391,7 +391,7 @@ func (s *MFAService) DisableMFA(userID string, password string, code string) err
 
 	// Log MFA disabled
 	userUUID, _ := uuid.Parse(userID)
-	s.audit.LogEvent(&AuditEventParams{
+	_ = s.audit.LogEvent(&AuditEventParams{
 		UserID:     &userUUID,
 		Action:     "mfa_disabled",
 		Resource:   "user",
@@ -456,7 +456,7 @@ func (s *MFAService) RegenerateBackupCodes(userID string, password string, code 
 
 	// Log backup codes regenerated
 	userUUID, _ := uuid.Parse(userID)
-	s.audit.LogEvent(&AuditEventParams{
+	_ = s.audit.LogEvent(&AuditEventParams{
 		UserID:     &userUUID,
 		Action:     "mfa_backup_codes_regenerated",
 		Resource:   "user",

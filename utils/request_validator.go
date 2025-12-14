@@ -18,11 +18,11 @@ func NewCustomValidator() *CustomValidator {
 	v := validator.New()
 
 	// Register custom validators
-	v.RegisterValidation("mxlookup", validateEmailMX)
-	v.RegisterValidation("noxss", validateNoXSS)
-	v.RegisterValidation("nosqli", validateNoSQLi)
-	v.RegisterValidation("safepath", validateSafePath)
-	v.RegisterValidation("alphanumunicode", validateAlphaNumUnicode)
+	_ = v.RegisterValidation("mxlookup", validateEmailMX)
+	_ = v.RegisterValidation("noxss", validateNoXSS)
+	_ = v.RegisterValidation("nosqli", validateNoSQLi)
+	_ = v.RegisterValidation("safepath", validateSafePath)
+	_ = v.RegisterValidation("alphanumunicode", validateAlphaNumUnicode)
 
 	return &CustomValidator{Validator: v}
 }

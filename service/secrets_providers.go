@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -37,7 +36,7 @@ func NewLocalSecretsProvider(secretsDir string, logger *zap.Logger) *LocalSecret
 func (p *LocalSecretsProvider) GetSecret(ctx context.Context, key string) (string, error) {
 	filePath := filepath.Join(p.secretsDir, key+".enc")
 
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", fmt.Errorf("secret not found: %s", key)
@@ -55,7 +54,7 @@ func (p *LocalSecretsProvider) SetSecret(ctx context.Context, key, value string)
 	}
 
 	filePath := filepath.Join(p.secretsDir, key+".enc")
-	return ioutil.WriteFile(filePath, []byte(value), 0600)
+	return os.WriteFile(filePath, []byte(value), 0600)
 }
 
 // DeleteSecret removes a secret from local storage
@@ -66,7 +65,7 @@ func (p *LocalSecretsProvider) DeleteSecret(ctx context.Context, key string) err
 
 // ListSecrets lists all secret keys
 func (p *LocalSecretsProvider) ListSecrets(ctx context.Context) ([]string, error) {
-	files, err := ioutil.ReadDir(p.secretsDir)
+	files, err := os.ReadDir(p.secretsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []string{}, nil
@@ -263,7 +262,7 @@ func DefaultRotationConfig() SecretRotationConfig {
 
 // LoadRotationConfig loads rotation configuration from file
 func LoadRotationConfig(filePath string) (*SecretRotationConfig, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Return default config if file doesn't exist
@@ -288,5 +287,5 @@ func SaveRotationConfig(config *SecretRotationConfig, filePath string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(filePath, data, 0600)
+	return os.WriteFile(filePath, data, 0600)
 }

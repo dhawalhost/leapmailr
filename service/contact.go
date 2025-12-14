@@ -45,7 +45,7 @@ func CreateContact(req models.CreateContactRequest, userID uuid.UUID) (*models.C
 		if len(req.Metadata) > 0 {
 			var existingMeta map[string]string
 			if existingContact.Metadata != "" {
-				json.Unmarshal([]byte(existingContact.Metadata), &existingMeta)
+				_ = json.Unmarshal([]byte(existingContact.Metadata), &existingMeta)
 			} else {
 				existingMeta = make(map[string]string)
 			}
@@ -60,7 +60,7 @@ func CreateContact(req models.CreateContactRequest, userID uuid.UUID) (*models.C
 		if len(req.Tags) > 0 {
 			var existingTags []string
 			if existingContact.Tags != "" {
-				json.Unmarshal([]byte(existingContact.Tags), &existingTags)
+				_ = json.Unmarshal([]byte(existingContact.Tags), &existingTags)
 			}
 			tagMap := make(map[string]bool)
 			for _, tag := range existingTags {
@@ -328,10 +328,10 @@ func toContactResponse(c *models.Contact) *models.ContactResponse {
 	var tags []string
 
 	if c.Metadata != "" {
-		json.Unmarshal([]byte(c.Metadata), &metadata)
+		_ = json.Unmarshal([]byte(c.Metadata), &metadata)
 	}
 	if c.Tags != "" {
-		json.Unmarshal([]byte(c.Tags), &tags)
+		_ = json.Unmarshal([]byte(c.Tags), &tags)
 	}
 
 	return &models.ContactResponse{

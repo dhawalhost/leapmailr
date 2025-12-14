@@ -137,10 +137,8 @@ func SendAutoReply(config *models.AutoReplyConfig, recipientEmail string, variab
 
 	// Convert string map to interface map for TemplateParams
 	templateParams := make(map[string]interface{})
-	if variables != nil {
-		for k, v := range variables {
-			templateParams[k] = v
-		}
+	for k, v := range variables {
+		templateParams[k] = v
 	}
 
 	// Create email request

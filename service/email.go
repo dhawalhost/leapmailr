@@ -444,7 +444,7 @@ func (s *EmailService) sendEmailViaSMTP(service models.EmailService, template mo
 	if err != nil {
 		return err
 	}
-	defer client.Quit()
+	defer func() { _ = client.Quit() }()
 
 	// Authenticate
 	if err := s.authenticateSMTP(client, auth, config); err != nil {
@@ -666,38 +666,6 @@ func getReplyToEmail(template models.Template, service models.EmailService) stri
 		return service.FromEmail
 	}
 	return ""
-}
-
-// Backward compatibility - keep old functions for any existing code
-func getFromEmail(reqFromEmail string, service models.EmailService) string {
-	if reqFromEmail != "" {
-		return reqFromEmail
-	}
-	// Use service's configured sender email (NOT the SMTP credentials email)
-	if service.FromEmail != "" {
-		return service.FromEmail
-	}
-	return defaultNoReplyAddr
-}
-
-func getFromName(reqFromName string, service models.EmailService) string {
-	if reqFromName != "" {
-		return reqFromName
-	}
-	// Use service's configured sender name
-	if service.FromName != "" {
-		return service.FromName
-	}
-	return "LeapMailr"
-}
-
-func stripHTML(html string) string {
-	// Simple HTML stripper - in production use a proper library
-	text := strings.ReplaceAll(html, "<br>", "\n")
-	text = strings.ReplaceAll(text, "<br/>", "\n")
-	text = strings.ReplaceAll(text, "<br />", "\n")
-	// TODO: Implement proper HTML stripping
-	return text
 }
 
 func parseSMTPConfig(config string) smtpConfig {

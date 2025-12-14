@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -177,7 +178,7 @@ func (s *AuthService) findActiveUser(email, ipAddress, userAgent string) (models
 		if err == gorm.ErrRecordNotFound {
 			auditService := NewAuditService()
 			_ = auditService.LogLogin(nil, email, false, ipAddress, userAgent, errUserNotFound)
-			return user, fmt.Errorf(errInvalidCredentials)
+			return user, errors.New(errInvalidCredentials)
 		}
 		return user, fmt.Errorf("database error: %w", err)
 	}
@@ -224,13 +225,11 @@ func (s *AuthService) handleFailedLogin(user *models.User, now time.Time, ipAddr
 
 	// Log failed login
 	auditService := NewAuditService()
-	_ = auditService.LogLogin(&user.ID, user.Email, false, ipAddress, userAgent,
-		fmt.Sprintf("invalid password (attempt %d/%d)", user.FailedLoginAttempts, maxFailedAttempts))
+		_ = auditService.LogLogin(&user.ID, user.Email, false, ipAddress, userAgent,
+			fmt.Sprintf("invalid password (attempt %d/%d)", user.FailedLoginAttempts, maxFailedAttempts))
 
-	return fmt.Errorf(errInvalidCredentials)
-}
-
-// lockAccount locks the user account after too many failed attempts
+	return errors.New(errInvalidCredentials)
+}// lockAccount locks the user account after too many failed attempts
 func (s *AuthService) lockAccount(user *models.User, now time.Time, lockoutMinutes int, ipAddress, userAgent string) error {
 	lockoutUntil := now.Add(time.Duration(lockoutMinutes) * time.Minute)
 	user.LockedUntil = &lockoutUntil
@@ -302,12 +301,12 @@ func (s *AuthService) generateAuthResponse(user *models.User, ipAddress, userAge
 func (s *AuthService) LoginWithMFA(email, password, mfaCode string, ipAddress, userAgent string, encryption *utils.EncryptionService) (*models.AuthResponse, error) {
 	var user models.User
 	if err := s.db.Where(queryEmailIsActive, email, true).First(&user).Error; err != nil {
-		return nil, fmt.Errorf(errInvalidCredentials)
+		return nil, errors.New(errInvalidCredentials)
 	}
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return nil, fmt.Errorf(errInvalidCredentials)
+		return nil, errors.New(errInvalidCredentials)
 	}
 
 	// Check if MFA is enabled
@@ -347,12 +346,12 @@ func (s *AuthService) LoginWithMFA(email, password, mfaCode string, ipAddress, u
 func (s *AuthService) LoginWithBackupCode(email, password, backupCode string, ipAddress, userAgent string, encryption *utils.EncryptionService) (*models.AuthResponse, error) {
 	var user models.User
 	if err := s.db.Where(queryEmailIsActive, email, true).First(&user).Error; err != nil {
-		return nil, fmt.Errorf(errInvalidCredentials)
+		return nil, errors.New(errInvalidCredentials)
 	}
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return nil, fmt.Errorf(errInvalidCredentials)
+		return nil, errors.New(errInvalidCredentials)
 	}
 
 	// Check if MFA is enabled
@@ -485,7 +484,7 @@ func (s *AuthService) verifyTokenNotRevoked(token string) error {
 func (s *AuthService) getActiveUser(userID uuid.UUID) (*models.User, error) {
 	var user models.User
 	if err := s.db.Where("id = ? AND is_active = ?", userID, true).First(&user).Error; err != nil {
-		return nil, fmt.Errorf(errUserNotFound)
+		return nil, errors.New(errUserNotFound)
 	}
 	return &user, nil
 }
@@ -539,7 +538,7 @@ func (s *AuthService) ValidateJWT(tokenString string) (*models.User, error) {
 	var user models.User
 	if err := s.db.Where("id = ? AND is_active = ?", userID, true).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, fmt.Errorf(errUserNotFound)
+			return nil, errors.New(errUserNotFound)
 		}
 		return nil, fmt.Errorf("database error: %w", err)
 	}

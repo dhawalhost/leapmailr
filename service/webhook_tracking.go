@@ -178,14 +178,14 @@ func (s *WebhookTrackingService) handleSuppressionEvents(event EmailEvent, email
 
 	switch event.Event {
 	case "complained", "spamreport", "spam":
-		suppressionService.AddSuppressionFromWebhook(
+		_ = suppressionService.AddSuppressionFromWebhook(
 			emailLog.ToEmail,
 			models.SuppressionComplaint,
 			event.Metadata,
 			emailLog.UserID,
 		)
 	case "unsubscribed", "unsubscribe":
-		suppressionService.AddSuppressionFromWebhook(
+		_ = suppressionService.AddSuppressionFromWebhook(
 			emailLog.ToEmail,
 			models.SuppressionUnsubscribe,
 			event.Metadata,

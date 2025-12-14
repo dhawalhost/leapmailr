@@ -9,6 +9,9 @@ import (
 	"unicode"
 )
 
+// Compile regex patterns once at package level for performance
+var tagValidationRegex = regexp.MustCompile(`^[a-zA-Z0-9 _-]+$`)
+
 // ValidatePaginationParams validates and sanitizes limit/offset parameters
 // Returns sanitized values with defaults and bounds checking
 func ValidatePaginationParams(limitStr, offsetStr string) (limit, offset int, err error) {
@@ -199,12 +202,7 @@ func ValidateTagsList(tagsStr string) ([]string, error) {
 		}
 
 		// Allow alphanumeric, spaces, hyphens, underscores
-		matched, err := regexp.MatchString("^[a-zA-Z0-9 _-]+$", tag)
-		if err != nil {
-			return nil, fmt.Errorf("regex error: %v", err)
-		}
-
-		if !matched {
+		if !tagValidationRegex.MatchString(tag) {
 			return nil, fmt.Errorf("tag '%s' contains invalid characters (allowed: a-z, A-Z, 0-9, space, _, -)", tag)
 		}
 

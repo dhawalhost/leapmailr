@@ -32,7 +32,7 @@ func TrackOpenHandler(c *gin.Context) {
 	// Record open event (async to not slow down pixel load)
 	go func() {
 		trackingService := service.NewEmailTrackingService()
-		trackingService.RecordOpen(trackingPixelID, ipAddress, userAgent)
+		_ = trackingService.RecordOpen(trackingPixelID, ipAddress, userAgent)
 	}()
 
 	// Return 1x1 transparent GIF
@@ -86,7 +86,7 @@ func TrackClickHandler(c *gin.Context) {
 	// Record click event (async)
 	go func() {
 		trackingService := service.NewEmailTrackingService()
-		trackingService.RecordClick(trackingPixelID, linkID, originalURL, ipAddress, userAgent)
+		_ = trackingService.RecordClick(trackingPixelID, linkID, originalURL, ipAddress, userAgent)
 	}()
 
 	// Redirect to pre-approved URL from database (NOT from user input)

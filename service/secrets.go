@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -259,7 +258,7 @@ func (sm *SecretsManager) ListSecrets(ctx context.Context) ([]string, error) {
 
 // loadMetadata loads secret metadata from disk
 func (sm *SecretsManager) loadMetadata() error {
-	data, err := ioutil.ReadFile(sm.metadataFile)
+	data, err := os.ReadFile(sm.metadataFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil // File doesn't exist yet, that's ok
@@ -282,7 +281,7 @@ func (sm *SecretsManager) saveMetadata() error {
 		return err
 	}
 
-	return ioutil.WriteFile(sm.metadataFile, data, 0600)
+	return os.WriteFile(sm.metadataFile, data, 0600)
 }
 
 // StartRotationMonitor starts a background goroutine to monitor rotation needs
